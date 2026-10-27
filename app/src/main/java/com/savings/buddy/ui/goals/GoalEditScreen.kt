@@ -15,8 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -51,6 +51,7 @@ import com.savings.buddy.business.Money
 import com.savings.buddy.data.AppContainer
 import com.savings.buddy.data.Goal
 import com.savings.buddy.ui.common.simpleViewModelFactory
+import com.savings.buddy.ui.i18n.LocalStrings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -73,22 +74,23 @@ class GoalEditViewModel(private val container: AppContainer) : ViewModel() {
         deadlineEpochDay: Long?,
         note: String,
         colorIndex: Int,
+        t: com.savings.buddy.ui.i18n.Strings,
         onError: (String) -> Unit,
         onSuccess: () -> Unit,
     ) {
         viewModelScope.launch {
             val trimmedName = name.trim()
-            if (trimmedName.isEmpty()) { onError("请输入目标名称"); return@launch }
+            if (trimmedName.isEmpty()) { onError(t.geErrNameEmpty); return@launch }
             val target = Money.parseToCents(targetText)
-            if (target == null) { onError("目标金额格式不正确，最多两位小数"); return@launch }
-            if (target <= 0) { onError("目标金额必须大于零"); return@launch }
+            if (target == null) { onError(t.geErrTargetFormat); return@launch }
+            if (target <= 0) { onError(t.geErrTargetPositive); return@launch }
             // 新建时不允许已经过期的截止日期；编辑旧目标不强制
             if (goalId == null && deadlineEpochDay != null && deadlineEpochDay < LocalDate.now().toEpochDay()) {
-                onError("截止日期不能早于今天"); return@launch
+                onError(t.geErrDeadlinePast); return@launch
             }
 
             if (goalId != null && loaded.value == null) {
-                onError("目标数据尚未加载完成，请稍候重试"); return@launch
+                onError(t.geErrNotLoaded); return@launch
             }
             val existing = goalId?.let { loaded.value } ?: Goal(
                 name = trimmedName, targetCents = target, createdAtEpochDay = LocalDate.now().toEpochDay(),
@@ -113,6 +115,7 @@ fun GoalEditScreen(
     goalId: Long?,
     onBack: () -> Unit,
 ) {
+    val t = LocalStrings.current
     val vm: GoalEditViewModel = viewModel(factory = simpleViewModelFactory { GoalEditViewModel(container) })
     LaunchedEffect(goalId) { vm.load(goalId) }
 
@@ -140,10 +143,10 @@ fun GoalEditScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (goalId == null) "创建储蓄目标" else "编辑目标") },
+                title = { Text(if (goalId == null) t.geCreateTitle else t.geEditTitle) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = t.geBack)
                     }
                 },
             )
@@ -160,7 +163,7 @@ fun GoalEditScreen(
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it; error = null },
-                label = { Text("目标名称") },
+                label = { Text(t.geName) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -168,27 +171,25 @@ fun GoalEditScreen(
             OutlinedTextField(
                 value = targetText,
                 onValueChange = { targetText = it; error = null },
-                label = { Text("目标金额（元）") },
+                label = { Text(t.geTargetAmount) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
             )
 
             Column {
-                Text("截止日期（可选）", style = MaterialTheme.typography.labelLarge)
+                Text(t.geDeadlineOptional, style = MaterialTheme.typography.labelLarge)
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        deadline?.let { LocalDate.ofEpochDay(it).toString() } ?: "不设置"
-                    )
+                    Text(deadline?.let { LocalDate.ofEpochDay(it).toString() } ?: t.geDeadlineNone)
                 }
                 if (deadline != null) {
-                    TextButton(onClick = { deadline = null }) { Text("清除截止日期") }
+                    TextButton(onClick = { deadline = null }) { Text(t.geClearDeadline) }
                 }
             }
 
             Column {
-                Text("主题颜色", style = MaterialTheme.typography.labelLarge)
+                Text(t.geThemeColor, style = MaterialTheme.typography.labelLarge)
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     repeat(6) { i ->
@@ -212,7 +213,7 @@ fun GoalEditScreen(
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
-                label = { Text("备注（可选）") },
+                label = { Text(t.geNoteLabel) },
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -222,11 +223,11 @@ fun GoalEditScreen(
 
             Button(
                 onClick = {
-                    vm.save(goalId, name, targetText, deadline, note, colorIndex,
+                    vm.save(goalId, name, targetText, deadline, note, colorIndex, t,
                         onError = { error = it }, onSuccess = onBack)
                 },
                 modifier = Modifier.fillMaxWidth().height(48.dp),
-            ) { Text(if (goalId == null) "创建目标" else "保存修改") }
+            ) { Text(if (goalId == null) t.geBtnCreate else t.geBtnSave) }
 
             Spacer(Modifier.height(24.dp))
         }
@@ -244,9 +245,9 @@ fun GoalEditScreen(
                         deadline = Instant.ofEpochMilli(ms).atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
                     }
                     showDatePicker = false
-                }) { Text("确定") }
+                }) { Text(t.commonConfirm) }
             },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text(t.commonCancel) } },
         ) {
             DatePicker(state = pickerState)
         }

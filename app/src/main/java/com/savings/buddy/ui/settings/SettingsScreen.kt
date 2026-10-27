@@ -23,8 +23,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -53,11 +53,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.savings.buddy.data.LANG_EN
+import com.savings.buddy.data.LANG_JA
+import com.savings.buddy.data.LANG_KO
+import com.savings.buddy.data.LANG_SYSTEM
+import com.savings.buddy.data.LANG_ZH_CN
+import com.savings.buddy.data.LANG_ZH_TW
 import com.savings.buddy.data.PALETTE_SYSTEM
 import com.savings.buddy.data.THEME_DARK
 import com.savings.buddy.data.THEME_LIGHT
 import com.savings.buddy.data.THEME_SYSTEM
 import com.savings.buddy.ui.common.simpleViewModelFactory
+import com.savings.buddy.ui.i18n.LocalStrings
+import com.savings.buddy.ui.i18n.Strings
 import com.savings.buddy.ui.theme.ThemePalettes
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,6 +74,7 @@ fun SettingsScreen(
     container: com.savings.buddy.data.AppContainer,
     onGoAchievements: () -> Unit = {},
 ) {
+    val t = LocalStrings.current
     val context = LocalContext.current
     val vm: SettingsViewModel = viewModel(factory = simpleViewModelFactory { SettingsViewModel(container) })
     val state by vm.state.collectAsState()
@@ -76,6 +85,7 @@ fun SettingsScreen(
     var showClearConfirm by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var paletteExpanded by remember { mutableStateOf(false) }
+    var languageExpanded by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -107,25 +117,25 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("设置", style = MaterialTheme.typography.titleLarge)
+            Text(t.setTitle, style = MaterialTheme.typography.titleLarge)
 
             // 外观
-            SectionCard("外观") {
+            SectionCard(t.setAppearance) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = state.theme == THEME_SYSTEM,
                         onClick = { vm.setTheme(THEME_SYSTEM) },
-                        label = { Text("跟随系统") },
+                        label = { Text(t.setThemeSystem) },
                     )
                     FilterChip(
                         selected = state.theme == THEME_LIGHT,
                         onClick = { vm.setTheme(THEME_LIGHT) },
-                        label = { Text("浅色") },
+                        label = { Text(t.setThemeLight) },
                     )
                     FilterChip(
                         selected = state.theme == THEME_DARK,
                         onClick = { vm.setTheme(THEME_DARK) },
-                        label = { Text("深色") },
+                        label = { Text(t.setThemeDark) },
                     )
                 }
 
@@ -138,9 +148,8 @@ fun SettingsScreen(
                         .clickable { paletteExpanded = !paletteExpanded },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("主题色", style = MaterialTheme.typography.bodyLarge)
+                    Text(t.setPalette, style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.weight(1f))
-                    // 当前选择预览
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         currentPalettePreview(state.palette).forEach { color ->
                             Box(
@@ -153,22 +162,22 @@ fun SettingsScreen(
                     }
                     Spacer(Modifier.size(6.dp))
                     Text(
-                        paletteLabel(state.palette),
+                        paletteLabel(state.palette, t),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Icon(
                         Icons.Filled.ArrowDropDown,
-                        contentDescription = if (paletteExpanded) "收起" else "展开",
+                        contentDescription = if (paletteExpanded) t.cdCollapse else t.cdExpand,
                     )
                 }
 
                 if (paletteExpanded) {
                     Spacer(Modifier.height(4.dp))
-                    // 跟随系统（默认，动态取色）
                     PaletteOptionRow(
-                        label = "跟随系统（默认）",
-                        sub = if (Build.VERSION.SDK_INT >= 31) "使用壁纸动态取色" else "经典青绿（需 Android 12+ 动态取色）",
+                        label = t.setPaletteSystem,
+                        sub = if (Build.VERSION.SDK_INT >= 31) t.setPaletteSystemSubModern
+                        else t.setPaletteSystemSubLegacy,
                         selected = state.palette == PALETTE_SYSTEM,
                         preview = listOf(
                             MaterialTheme.colorScheme.primary,
@@ -177,7 +186,6 @@ fun SettingsScreen(
                         ),
                         onClick = { vm.setPalette(PALETTE_SYSTEM) },
                     )
-                    // 固定色板
                     ThemePalettes.ALL.forEach { spec ->
                         PaletteOptionRow(
                             label = spec.label,
@@ -190,13 +198,57 @@ fun SettingsScreen(
                 }
             }
 
+            // 语言（无论当前语言是什么，旁边始终带 (Language) 标注）
+            SectionCard(t.setLanguage + " (Language)") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { languageExpanded = !languageExpanded },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(t.setLanguage, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            t.setLanguageSub,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        languageLabel(state.language, t),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Icon(
+                        Icons.Filled.ArrowDropDown,
+                        contentDescription = if (languageExpanded) t.cdCollapse else t.cdExpand,
+                    )
+                }
+
+                if (languageExpanded) {
+                    Spacer(Modifier.height(4.dp))
+                    // 系统语言选项（本地化文案）
+                    LanguageOptionRow(
+                        label = t.langSystem,
+                        selected = state.language == LANG_SYSTEM,
+                        onClick = { vm.setLanguage(LANG_SYSTEM) },
+                    )
+                    // 各语言选项以自己的语言显示
+                    LanguageOptionRow("English", state.language == LANG_EN, onClick = { vm.setLanguage(LANG_EN) })
+                    LanguageOptionRow("简体中文", state.language == LANG_ZH_CN, onClick = { vm.setLanguage(LANG_ZH_CN) })
+                    LanguageOptionRow("繁體中文", state.language == LANG_ZH_TW, onClick = { vm.setLanguage(LANG_ZH_TW) })
+                    LanguageOptionRow("日本語", state.language == LANG_JA, onClick = { vm.setLanguage(LANG_JA) })
+                    LanguageOptionRow("한국어", state.language == LANG_KO, onClick = { vm.setLanguage(LANG_KO) })
+                }
+            }
+
             // 提醒
-            SectionCard("每日提醒") {
+            SectionCard(t.setReminder) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("每天提醒我攒钱", style = MaterialTheme.typography.bodyLarge)
+                        Text(t.setReminderDaily, style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            "提醒时间 ${"%02d".format(state.reminderHour)}:${"%02d".format(state.reminderMinute)}",
+                            t.setReminderTime.format("%02d:%02d".format(state.reminderHour, state.reminderMinute)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -215,42 +267,41 @@ fun SettingsScreen(
                     )
                 }
                 if (state.reminderEnabled) {
-                    TextButton(onClick = { showTimePicker = true }) { Text("修改提醒时间") }
+                    TextButton(onClick = { showTimePicker = true }) { Text(t.setReminderChange) }
                 }
             }
 
             // 成就
-            SectionCard("成就") {
+            SectionCard(t.setAchievements) {
                 Text(
-                    "已解锁的攒钱里程碑",
+                    t.setAchDesc,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                TextButton(onClick = onGoAchievements) { Text("查看成就") }
+                TextButton(onClick = onGoAchievements) { Text(t.setAchView) }
             }
 
             // 数据
-            SectionCard("数据") {
+            SectionCard(t.setData) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = { exportLauncher.launch("saving_assistant_backup.json") }) {
-                        Text("导出数据（JSON 备份）")
+                    TextButton(onClick = { exportLauncher.launch("mossy_backup.json") }) {
+                        Text(t.setExport)
                     }
                     TextButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/*")) }) {
-                        Text("导入数据（覆盖现有数据）")
+                        Text(t.setImport)
                     }
                     TextButton(onClick = { showClearConfirm = true }) {
-                        Text("清除全部数据", color = MaterialTheme.colorScheme.error)
+                        Text(t.setClear, color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
 
             // 关于
-            SectionCard("关于") {
-                Text("Mossy v1.1.3", style = MaterialTheme.typography.bodyLarge)
+            SectionCard(t.setAbout) {
+                Text(t.setVersion.format("1.2.0"), style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "隐私说明：所有数据仅保存在本机，不上传服务器，不要求账号。" +
-                        "本应用不接触资金，不提供支付或转账功能，实际攒钱由你自行完成。",
+                    t.setPrivacy,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -268,43 +319,43 @@ fun SettingsScreen(
         )
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
-            title = { Text("选择提醒时间") },
+            title = { Text(t.setReminderChange) },
             text = { TimePicker(state = tpState) },
             confirmButton = {
                 TextButton(onClick = {
                     vm.setReminder(context, true, tpState.hour, tpState.minute)
                     showTimePicker = false
-                }) { Text("确定") }
+                }) { Text(t.commonConfirm) }
             },
-            dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text(t.commonCancel) } },
         )
     }
 
     showImportConfirm?.let { uri ->
         AlertDialog(
             onDismissRequest = { showImportConfirm = null },
-            title = { Text("覆盖现有数据？") },
-            text = { Text("导入备份将删除当前全部目标与流水，并替换为备份内容。此操作无法撤销。") },
+            title = { Text(t.importConfirmTitle) },
+            text = { Text(t.importConfirmMsg) },
             confirmButton = {
                 TextButton(onClick = { vm.importFrom(context, uri); showImportConfirm = null }) {
-                    Text("覆盖导入", color = MaterialTheme.colorScheme.error)
+                    Text(t.importConfirmYes, color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { showImportConfirm = null }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { showImportConfirm = null }) { Text(t.commonCancel) } },
         )
     }
 
     if (showClearConfirm) {
         AlertDialog(
             onDismissRequest = { showClearConfirm = false },
-            title = { Text("清除全部数据？") },
-            text = { Text("所有目标、计划与流水将被删除且无法恢复。建议先导出备份。") },
+            title = { Text(t.clearConfirmTitle) },
+            text = { Text(t.clearConfirmMsg) },
             confirmButton = {
                 TextButton(onClick = { vm.clearData(); showClearConfirm = false }) {
-                    Text("清除", color = MaterialTheme.colorScheme.error)
+                    Text(t.clearConfirmYes, color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { showClearConfirm = false }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { showClearConfirm = false }) { Text(t.commonCancel) } },
         )
     }
 }
@@ -335,8 +386,44 @@ private fun currentPalettePreview(palette: Int): List<Color> {
     }
 }
 
-private fun paletteLabel(palette: Int): String =
-    if (palette == PALETTE_SYSTEM) "跟随系统" else ThemePalettes.byKey(palette).label
+private fun paletteLabel(palette: Int, t: Strings): String =
+    if (palette == PALETTE_SYSTEM) {
+        t.setPaletteSystem
+            .replace("（默认）", "")
+            .replace("(default)", "")
+    } else ThemePalettes.byKey(palette).label
+
+private fun languageLabel(language: Int, t: Strings): String = when (language) {
+    LANG_EN -> "English"
+    LANG_ZH_CN -> "简体中文"
+    LANG_ZH_TW -> "繁體中文"
+    LANG_JA -> "日本語"
+    LANG_KO -> "한국어"
+    else -> t.langSystem
+}
+
+/** 语言选项行 */
+@Composable
+private fun LanguageOptionRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        if (selected) {
+            Text("✓", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
 
 /** 主题色选项行：色块预览 + 名称 + 选中态 */
 @Composable

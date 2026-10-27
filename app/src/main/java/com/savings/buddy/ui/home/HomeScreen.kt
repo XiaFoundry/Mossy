@@ -33,6 +33,7 @@ import com.savings.buddy.ui.common.simpleViewModelFactory
 import com.savings.buddy.ui.components.AllocationDialog
 import com.savings.buddy.ui.components.RingProgress
 import com.savings.buddy.ui.components.ringColorFor
+import com.savings.buddy.ui.i18n.LocalStrings
 import java.time.LocalDate
 
 /** 首页：全目标聚合环状进度图 */
@@ -43,6 +44,7 @@ fun HomeScreen(
 ) {
     val vm: HomeViewModel = viewModel(factory = simpleViewModelFactory { HomeViewModel(container) })
     val state by vm.state.collectAsState()
+    val t = LocalStrings.current
 
     if (!state.hasGoals) {
         EmptyHome(onCreateGoal = onCreateGoal)
@@ -88,7 +90,7 @@ fun HomeScreen(
                                     fontWeight = FontWeight.SemiBold,
                                 )
                                 Text(
-                                    "已攒 / ${Money.format(state.targetTotalCents)}",
+                                    t.homeSavedPrefix + Money.format(state.targetTotalCents),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -97,16 +99,19 @@ fun HomeScreen(
                     }
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "全部目标（${state.goalCount} 个，${state.activeGoalCount} 个进行中）",
+                        t.homeAllGoals.format(state.goalCount, state.activeGoalCount),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "剩余 ${Money.format(progress?.remainingCents ?: 0)}" +
+                        buildString {
+                            append(t.homeRemaining.format(Money.format(progress?.remainingCents ?: 0)))
                             if ((progress?.exceededCents ?: 0) > 0) {
-                                " · 超额 ${Money.format(progress!!.exceededCents)}"
-                            } else "",
+                                append(" · ")
+                                append(t.homeExceeded.format(Money.format(progress!!.exceededCents)))
+                            }
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -120,19 +125,19 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
-            ) { Text("记录攒钱", style = MaterialTheme.typography.titleMedium) }
+            ) { Text(t.homeRecordButton, style = MaterialTheme.typography.titleMedium) }
         }
 
         item {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(16.dp)) {
                     Column(Modifier.weight(1f)) {
-                        Text("本月攒钱", style = MaterialTheme.typography.labelMedium,
+                        Text(t.homeMonthTotal, style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(Money.format(state.monthTotalCents), style = MaterialTheme.typography.titleMedium)
                     }
                     Column(Modifier.weight(1f)) {
-                        Text("累计攒钱", style = MaterialTheme.typography.labelMedium,
+                        Text(t.homeAllTotal, style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(Money.format(state.allTotalCents), style = MaterialTheme.typography.titleMedium)
                     }
@@ -160,6 +165,7 @@ fun HomeScreen(
 
 @Composable
 private fun EmptyHome(onCreateGoal: () -> Unit) {
+    val t = LocalStrings.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -169,15 +175,15 @@ private fun EmptyHome(onCreateGoal: () -> Unit) {
     ) {
         Text("◎", style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(16.dp))
-        Text("还没有储蓄目标", style = MaterialTheme.typography.titleLarge)
+        Text(t.homeEmptyTitle, style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
         Text(
-            "创建一个目标，看着圆环一点点填满",
+            t.homeEmptyDesc,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onCreateGoal) { Text("创建储蓄目标") }
+        Button(onClick = onCreateGoal) { Text(t.homeCreateGoal) }
     }
 }
