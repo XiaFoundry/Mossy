@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 金币图形：外圈 + 中间 ¥ 符号（用几何近似） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M54,54m-26,0a26,26 0,1 1,52 0a26,26 0,1 1,-52 0" />
+    <path
+        android:fillColor="#00695C"
+        android:pathData="M44,44 h4.5 l5.5,9 5.5,-9 h4.5 l-7.5,12 h5 v3 h-6 v3 h6 v3 h-6 v5 h-3 v-5 h-6 v-3 h6 v-3 h-6 v-3 h5 z" />
+</vector>
