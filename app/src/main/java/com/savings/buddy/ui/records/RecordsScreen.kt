@@ -14,12 +14,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -42,9 +42,9 @@ import com.savings.buddy.data.AppContainer
 import com.savings.buddy.data.Goal
 import com.savings.buddy.data.RecordWithGoal
 import com.savings.buddy.data.SavingRecord
+import com.savings.buddy.ui.common.dateLabel
 import com.savings.buddy.ui.common.simpleViewModelFactory
 import com.savings.buddy.ui.components.RecordDialog
-import com.savings.buddy.ui.home.dateLabel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -73,17 +73,24 @@ class RecordsViewModel(private val container: AppContainer) : ViewModel() {
     fun setFilter(goalId: Long?) { filter.value = goalId }
 
     fun addRecord(goalId: Long, cents: Long, note: String, day: Long) {
-        viewModelScope.launch { repo.addRecord(goalId, cents, note, day) }
+        viewModelScope.launch {
+            repo.addRecord(goalId, cents, note, day)
+            container.achievementManager.onRecordsChanged()
+        }
     }
 
     fun updateRecord(record: SavingRecord, amountCents: Long, note: String, day: Long, goalId: Long) {
         viewModelScope.launch {
             repo.updateRecord(record.copy(amountCents = amountCents, note = note, saveEpochDay = day, goalId = goalId))
+            container.achievementManager.onRecordsChanged()
         }
     }
 
     fun deleteRecord(id: Long) {
-        viewModelScope.launch { repo.deleteRecord(id) }
+        viewModelScope.launch {
+            repo.deleteRecord(id)
+            container.achievementManager.onRecordsChanged()
+        }
     }
 }
 
@@ -113,7 +120,7 @@ fun RecordsScreen(container: AppContainer) {
                 Text("历史记录", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
                 Box {
-                    androidx.compose.material3.FilterChip(
+                    FilterChip(
                         selected = state.filterGoalId != null,
                         onClick = { showFilterMenu = true },
                         label = {
@@ -199,9 +206,7 @@ fun RecordsScreen(container: AppContainer) {
     if (adding) {
         RecordDialog(
             goals = state.goals,
-            activeGoal = null,
             editing = null,
-            defaultSuggestionCents = 0,
             todayEpochDay = today,
             onDismiss = { adding = false },
             onSave = { goalId, cents, note, day -> vm.addRecord(goalId, cents, note, day); adding = false },
@@ -211,9 +216,7 @@ fun RecordsScreen(container: AppContainer) {
     editing?.let { item ->
         RecordDialog(
             goals = state.goals,
-            activeGoal = state.goals.find { it.id == item.record.goalId },
             editing = item.record,
-            defaultSuggestionCents = 0,
             todayEpochDay = today,
             onDismiss = { editing = null },
             onSave = { goalId, cents, note, day ->
