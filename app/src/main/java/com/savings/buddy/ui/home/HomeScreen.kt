@@ -11,19 +11,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,32 +27,29 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.savings.buddy.business.GoalDisplay
-import com.savings.buddy.business.GoalDisplayCalc
 import com.savings.buddy.business.Money
 import com.savings.buddy.data.AppContainer
-import com.savings.buddy.data.Goal
 import com.savings.buddy.ui.common.simpleViewModelFactory
-import com.savings.buddy.ui.components.RecordDialog
+import com.savings.buddy.ui.components.AllocationDialog
+import com.savings.buddy.ui.components.RingProgress
 import com.savings.buddy.ui.components.ringColorFor
 import java.time.LocalDate
 
+/** 首页：全目标聚合环状进度图 */
 @Composable
 fun HomeScreen(
     container: AppContainer,
     onCreateGoal: () -> Unit,
-    onGoRecords: () -> Unit,
 ) {
     val vm: HomeViewModel = viewModel(factory = simpleViewModelFactory { HomeViewModel(container) })
     val state by vm.state.collectAsState()
 
-    if (!state.hasGoal) {
+    if (!state.hasGoals) {
         EmptyHome(onCreateGoal = onCreateGoal)
         return
     }
 
-    var showRecordDialog by remember { mutableStateOf(false) }
-    var showGoalMenu by remember { mutableStateOf(false) }
+    var showAllocationDialog by remember { mutableStateOf(false) }
     val today = LocalDate.now().toEpochDay()
 
     LazyColumn(
@@ -70,33 +58,7 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("攒钱小助手", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
-                Box {
-                    AssistChip(
-                        onClick = { showGoalMenu = true },
-                        label = { Text(state.goal?.name ?: "") },
-                        trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = "切换目标") },
-                    )
-                    DropdownMenu(expanded = showGoalMenu, onDismissRequest = { showGoalMenu = false }) {
-                        state.goals.forEach { g ->
-                            DropdownMenuItem(
-                                text = { Text(g.name) },
-                                leadingIcon = {
-                                    if (g.id == state.goal?.id) {
-                                        Icon(Icons.Filled.Check, contentDescription = null)
-                                    }
-                                },
-                                onClick = { vm.setCurrentGoal(g.id); showGoalMenu = false },
-                            )
-                        }
-                    }
-                }
-            }
+            Text("Mossy", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
 
         item {
@@ -109,7 +71,7 @@ fun HomeScreen(
                 ) {
                     val progress = state.progress
                     Box(modifier = Modifier.size(240.dp), contentAlignment = Alignment.Center) {
-                        com.savings.buddy.ui.components.RingProgress(
+                        RingProgress(
                             progress = progress?.progress ?: 0f,
                             modifier = Modifier.fillMaxSize(),
                         ) {
@@ -121,12 +83,12 @@ fun HomeScreen(
                                     color = ringColorFor(progress?.progress ?: 0f),
                                 )
                                 Text(
-                                    Money.format(progress?.savedCents ?: 0),
+                                    Money.format(state.savedTotalCents),
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.SemiBold,
                                 )
                                 Text(
-                                    "已攒 / ${Money.format(progress?.targetCents ?: 0)}",
+                                    "已攒 / ${Money.format(state.targetTotalCents)}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -134,55 +96,19 @@ fun HomeScreen(
                         }
                     }
                     Spacer(Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            state.goal?.name ?: "",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Spacer(Modifier.size(8.dp))
-                        StatusChip(state.display, state.overdueDays)
-                    }
+                    Text(
+                        "全部目标（${state.goalCount} 个，${state.activeGoalCount} 个进行中）",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         "剩余 ${Money.format(progress?.remainingCents ?: 0)}" +
-                            (state.goal?.deadlineEpochDay?.let {
-                                " · 截止 ${LocalDate.ofEpochDay(it)}"
-                            } ?: ""),
+                            if ((progress?.exceededCents ?: 0) > 0) {
+                                " · 超额 ${Money.format(progress!!.exceededCents)}"
+                            } else "",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if ((progress?.exceededCents ?: 0) > 0) {
-                        Text(
-                            "超额完成 ${Money.format(progress!!.exceededCents)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-            }
-        }
-
-        item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("今日建议", style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(4.dp))
-                    val text = when (state.display) {
-                        GoalDisplay.RUNNING -> Money.format(state.suggestionCents) + " / 天"
-                        GoalDisplay.COMPLETED -> "目标已达成，保持就好"
-                        GoalDisplay.OVERDUE -> "已逾期 ${state.overdueDays} 天，剩余 ${Money.format(state.progress?.remainingCents ?: 0)}"
-                        GoalDisplay.PAUSED -> "目标已暂停"
-                        GoalDisplay.ARCHIVED -> "目标已归档"
-                        GoalDisplay.EMPTY -> ""
-                    }
-                    Text(
-                        text,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (state.display == GoalDisplay.OVERDUE) MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }
@@ -190,7 +116,7 @@ fun HomeScreen(
 
         item {
             Button(
-                onClick = { showRecordDialog = true },
+                onClick = { showAllocationDialog = true },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
@@ -206,91 +132,29 @@ fun HomeScreen(
                         Text(Money.format(state.monthTotalCents), style = MaterialTheme.typography.titleMedium)
                     }
                     Column(Modifier.weight(1f)) {
-                        Text("所有目标累计", style = MaterialTheme.typography.labelMedium,
+                        Text("累计攒钱", style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(Money.format(state.allTotalCents), style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }
         }
-
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("最近记录", style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.weight(1f))
-                TextButton(onClick = onGoRecords) { Text("查看全部") }
-            }
-        }
-
-        if (state.recent.isEmpty()) {
-            item {
-                Text(
-                    "还没有记录，点击「记录攒钱」开始第一笔吧",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        } else {
-            items(state.recent.size) { i ->
-                val r = state.recent[i]
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                        Column(Modifier.weight(1f)) {
-                            Text(dateLabel(r.saveEpochDay, today), style = MaterialTheme.typography.bodyMedium)
-                            if (r.note.isNotBlank()) {
-                                Text(
-                                    r.note,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                        Text(
-                            "+" + Money.format(r.amountCents),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-            }
-        }
     }
 
-    if (showRecordDialog) {
-        RecordDialog(
-            goals = state.goals,
-            activeGoal = state.goal,
-            editing = null,
-            defaultSuggestionCents = if (state.display == GoalDisplay.RUNNING) state.suggestionCents else 0,
+    if (showAllocationDialog) {
+        val activeGoals = state.goals.filter {
+            it.status == com.savings.buddy.data.GoalStatus.IN_PROGRESS
+        }
+        AllocationDialog(
+            goals = activeGoals,
             todayEpochDay = today,
-            onDismiss = { showRecordDialog = false },
-            onSave = { goalId, cents, note, day ->
-                vm.addRecord(goalId, cents, note, day)
-                showRecordDialog = false
+            onDismiss = { showAllocationDialog = false },
+            onSave = { allocations, note, day ->
+                vm.addAllocation(allocations, note, day)
+                showAllocationDialog = false
             },
         )
     }
-}
-
-@Composable
-private fun StatusChip(display: GoalDisplay, overdueDays: Long) {
-    val label = when (display) {
-        GoalDisplay.OVERDUE -> "已逾期 $overdueDays 天"
-        else -> GoalDisplayCalc.label(display)
-    }
-    AssistChip(
-        onClick = {},
-        enabled = false,
-        label = { Text(label) },
-    )
 }
 
 @Composable
@@ -315,10 +179,4 @@ private fun EmptyHome(onCreateGoal: () -> Unit) {
         Spacer(Modifier.height(24.dp))
         Button(onClick = onCreateGoal) { Text("创建储蓄目标") }
     }
-}
-
-fun dateLabel(epochDay: Long, todayEpochDay: Long): String = when (epochDay) {
-    todayEpochDay -> "今天"
-    todayEpochDay - 1 -> "昨天"
-    else -> LocalDate.ofEpochDay(epochDay).let { "${it.monthValue}月${it.dayOfMonth}日" }
 }
