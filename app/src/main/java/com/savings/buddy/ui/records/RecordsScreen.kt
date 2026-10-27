@@ -53,6 +53,7 @@ import com.savings.buddy.ui.common.fullDateLabel
 import com.savings.buddy.ui.common.simpleViewModelFactory
 import com.savings.buddy.ui.common.timeLabel
 import com.savings.buddy.ui.components.RecordDialog
+import com.savings.buddy.ui.i18n.LocalStrings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -108,6 +109,7 @@ fun RecordsScreen(
     container: AppContainer,
     onOpenDetail: (Long) -> Unit = {},
 ) {
+    val t = LocalStrings.current
     val vm: RecordsViewModel = viewModel(factory = simpleViewModelFactory { RecordsViewModel(container) })
     val state by vm.state.collectAsState()
     var showFilterMenu by remember { mutableStateOf(false) }
@@ -120,7 +122,7 @@ fun RecordsScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(onClick = { adding = true }) {
                 Icon(Icons.Filled.Add, contentDescription = null)
-                Text("  记一笔")
+                Text("  ${t.recFab}")
             }
         },
     ) { padding ->
@@ -130,7 +132,7 @@ fun RecordsScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("历史记录", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(t.recTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
                 Box {
                     FilterChip(
@@ -138,13 +140,16 @@ fun RecordsScreen(
                         onClick = { showFilterMenu = true },
                         label = {
                             Text(
-                                state.goals.find { it.id == state.filterGoalId }?.name ?: "全部目标"
+                                state.goals.find { it.id == state.filterGoalId }?.name ?: t.recFilterAll
                             )
                         },
                         leadingIcon = { Icon(Icons.Filled.FilterList, contentDescription = null) },
                     )
                     DropdownMenu(expanded = showFilterMenu, onDismissRequest = { showFilterMenu = false }) {
-                        DropdownMenuItem(text = { Text("全部目标") }, onClick = { vm.setFilter(null); showFilterMenu = false })
+                        DropdownMenuItem(
+                            text = { Text(t.recFilterAll) },
+                            onClick = { vm.setFilter(null); showFilterMenu = false },
+                        )
                         state.goals.forEach { g ->
                             DropdownMenuItem(
                                 text = { Text(g.name) },
@@ -161,9 +166,9 @@ fun RecordsScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Text("暂无记录", style = MaterialTheme.typography.titleMedium)
+                    Text(t.recEmptyTitle, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "点击右下角「记一笔」开始记录",
+                        t.recEmptyDesc,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -273,6 +278,7 @@ private fun RecordBatchCard(
     onToggleExpand: () -> Unit,
     onOpenDetail: (Long) -> Unit,
 ) {
+    val t = LocalStrings.current
     if (!batch.isMulti) {
         Card(modifier = Modifier.fillMaxWidth()) {
             RecordRow(batch.items.first(), todayEpochDay, onOpenDetail)
@@ -298,11 +304,11 @@ private fun RecordBatchCard(
                             )
                             Icon(
                                 Icons.Filled.ArrowDropDown,
-                                contentDescription = if (expanded) "收起" else "展开",
+                                contentDescription = if (expanded) t.cdCollapse else t.cdExpand,
                             )
                         }
                         Text(
-                            "一次分配 · ${batch.items.size} 个目标",
+                            t.recBatchMulti.format(batch.items.size),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

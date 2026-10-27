@@ -56,6 +56,8 @@ import com.savings.buddy.data.Goal
 import com.savings.buddy.data.GoalStatus
 import com.savings.buddy.ui.common.simpleViewModelFactory
 import com.savings.buddy.ui.components.ringColorFor
+import com.savings.buddy.ui.i18n.LocalStrings
+import com.savings.buddy.ui.i18n.goalStatusLabel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -111,6 +113,7 @@ fun GoalsScreen(
     onEditGoal: (Long) -> Unit,
     onCreateGoal: () -> Unit,
 ) {
+    val t = LocalStrings.current
     val vm: GoalsViewModel = viewModel(factory = simpleViewModelFactory { GoalsViewModel(container) })
     val state by vm.state.collectAsState()
     var menuFor by remember { mutableStateOf<GoalRow?>(null) }
@@ -124,7 +127,7 @@ fun GoalsScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(onClick = onCreateGoal) {
                 Icon(Icons.Filled.Add, contentDescription = null)
-                Text("  新建目标")
+                Text("  ${t.goalsFab}")
             }
         },
     ) { padding ->
@@ -134,9 +137,9 @@ fun GoalsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Text("还没有储蓄目标", style = MaterialTheme.typography.titleMedium)
+                Text(t.goalsEmptyTitle, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "点击右下角创建第一个目标",
+                    t.goalsEmptyDesc,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -153,12 +156,12 @@ fun GoalsScreen(
                         menuExpanded = menuFor?.goal?.id == activeRows[i].goal.id,
                         onMenuExpandedChange = { if (!it) menuFor = null },
                         onCardClick = { onEditGoal(activeRows[i].goal.id) },
-                        onMenu = { menuFor = activeRows[i] },
                         onPauseResume = { vm.togglePause(activeRows[i]) },
                         onArchive = { vm.archive(activeRows[i]) },
                         onUnarchive = { vm.unarchive(activeRows[i]) },
                         onEdit = { onEditGoal(activeRows[i].goal.id) },
                         onDelete = { confirmDelete = activeRows[i].goal },
+                        onMenu = { menuFor = activeRows[i] },
                     )
                 }
 
@@ -175,20 +178,20 @@ fun GoalsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(
-                                    "归档",
+                                    t.goalsArchived,
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.SemiBold,
                                 )
                                 Spacer(Modifier.size(8.dp))
                                 Text(
-                                    "${archivedRows.size} 个目标",
+                                    t.goalsArchivedCount.format(archivedRows.size),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                                 Spacer(Modifier.weight(1f))
                                 Icon(
                                     Icons.Filled.ArrowDropDown,
-                                    contentDescription = if (archivedExpanded) "收起" else "展开",
+                                    contentDescription = if (archivedExpanded) t.cdCollapse else t.cdExpand,
                                     modifier = Modifier.size(24.dp),
                                 )
                             }
@@ -201,12 +204,12 @@ fun GoalsScreen(
                                 menuExpanded = menuFor?.goal?.id == archivedRows[i].goal.id,
                                 onMenuExpandedChange = { if (!it) menuFor = null },
                                 onCardClick = { onEditGoal(archivedRows[i].goal.id) },
-                                onMenu = { menuFor = archivedRows[i] },
                                 onPauseResume = { vm.togglePause(archivedRows[i]) },
                                 onArchive = { vm.archive(archivedRows[i]) },
                                 onUnarchive = { vm.unarchive(archivedRows[i]) },
                                 onEdit = { onEditGoal(archivedRows[i].goal.id) },
                                 onDelete = { confirmDelete = archivedRows[i].goal },
+                                onMenu = { menuFor = archivedRows[i] },
                             )
                         }
                     }
@@ -215,18 +218,17 @@ fun GoalsScreen(
         }
     }
 
-    // 删除确认
     confirmDelete?.let { goal ->
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
-            title = { Text("删除目标「${goal.name}」？") },
-            text = { Text("该目标下的所有攒钱流水将被一并删除，且无法恢复。建议先导出备份。") },
+            title = { Text(t.goalsDeleteTitle.format(goal.name)) },
+            text = { Text(t.goalsDeleteMsg) },
             confirmButton = {
                 TextButton(onClick = { vm.delete(goal); confirmDelete = null }) {
-                    Text("删除", color = MaterialTheme.colorScheme.error)
+                    Text(t.goalsDelete, color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text(t.commonCancel) } },
         )
     }
 }
@@ -237,13 +239,14 @@ private fun GoalCard(
     menuExpanded: Boolean,
     onMenuExpandedChange: (Boolean) -> Unit,
     onCardClick: () -> Unit,
-    onMenu: () -> Unit,
     onPauseResume: () -> Unit,
     onArchive: () -> Unit,
     onUnarchive: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onMenu: () -> Unit,
 ) {
+    val t = LocalStrings.current
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -266,7 +269,7 @@ private fun GoalCard(
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    GoalDisplayCalc.label(row.display),
+                    t.goalStatusLabel(row.display),
                     style = MaterialTheme.typography.labelMedium,
                     color = if (row.display == GoalDisplay.OVERDUE) MaterialTheme.colorScheme.error
                     else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -274,33 +277,33 @@ private fun GoalCard(
                 // 菜单锚点：DropdownMenu 放在按钮所在的 Box 内，展开位置紧贴按钮
                 Box {
                     IconButton(onClick = onMenu) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = "更多操作")
+                        Icon(Icons.Filled.MoreVert, contentDescription = t.cdMore)
                     }
                     DropdownMenu(
                         expanded = menuExpanded,
                         onDismissRequest = { onMenuExpandedChange(false) },
                     ) {
                         DropdownMenuItem(
-                            text = { Text(if (row.goal.status == GoalStatus.PAUSED) "恢复进行" else "暂停") },
+                            text = { Text(if (row.goal.status == GoalStatus.PAUSED) t.goalsResume else t.goalsPause) },
                             onClick = { onPauseResume(); onMenuExpandedChange(false) },
                         )
                         if (row.goal.status == GoalStatus.ARCHIVED) {
                             DropdownMenuItem(
-                                text = { Text("取消归档") },
+                                text = { Text(t.goalsUnarchive) },
                                 onClick = { onUnarchive(); onMenuExpandedChange(false) },
                             )
                         } else {
                             DropdownMenuItem(
-                                text = { Text("归档") },
+                                text = { Text(t.goalsArchive) },
                                 onClick = { onArchive(); onMenuExpandedChange(false) },
                             )
                         }
                         DropdownMenuItem(
-                            text = { Text("编辑") },
+                            text = { Text(t.goalsEdit) },
                             onClick = { onEdit(); onMenuExpandedChange(false) },
                         )
                         DropdownMenuItem(
-                            text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+                            text = { Text(t.goalsDelete, color = MaterialTheme.colorScheme.error) },
                             onClick = { onDelete(); onMenuExpandedChange(false) },
                         )
                     }
@@ -328,7 +331,7 @@ private fun GoalCard(
             }
             row.goal.deadlineEpochDay?.let {
                 Text(
-                    "截止 ${LocalDate.ofEpochDay(it)}",
+                    t.goalDeadlinePrefix.format(LocalDate.ofEpochDay(it)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -27,13 +27,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.savings.buddy.business.AchievementDef
 import com.savings.buddy.data.AppContainer
 import com.savings.buddy.ui.achievements.AchievementsScreen
 import com.savings.buddy.ui.components.AchievementPopup
 import com.savings.buddy.ui.goals.GoalEditScreen
 import com.savings.buddy.ui.goals.GoalsScreen
 import com.savings.buddy.ui.home.HomeScreen
+import com.savings.buddy.ui.i18n.LocalStrings
 import com.savings.buddy.ui.records.RecordDetailScreen
 import com.savings.buddy.ui.records.RecordsScreen
 import com.savings.buddy.ui.settings.SettingsScreen
@@ -52,19 +52,24 @@ object Routes {
 
 private data class Tab(val route: String, val label: String, val icon: ImageVector)
 
-private val TABS = listOf(
-    Tab(Routes.HOME, "首页", Icons.Filled.Home),
-    Tab(Routes.RECORDS, "记录", Icons.AutoMirrored.Filled.ReceiptLong),
-    Tab(Routes.GOALS, "目标", Icons.Filled.Flag),
-    Tab(Routes.SETTINGS, "设置", Icons.Filled.Settings),
-)
+@Composable
+private fun tabs(): List<Tab> {
+    val t = LocalStrings.current
+    return listOf(
+        Tab(Routes.HOME, t.tabHome, Icons.Filled.Home),
+        Tab(Routes.RECORDS, t.tabRecords, Icons.AutoMirrored.Filled.ReceiptLong),
+        Tab(Routes.GOALS, t.tabGoals, Icons.Filled.Flag),
+        Tab(Routes.SETTINGS, t.tabSettings, Icons.Filled.Settings),
+    )
+}
 
 @Composable
 fun AppRoot(container: AppContainer) {
     val navController: NavHostController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
-    val showBottomBar = currentRoute in TABS.map { it.route }
+    val tabList = tabs()
+    val showBottomBar = currentRoute in tabList.map { it.route }
 
     // 应用启动：更新登录连击/首次启动并评估成就
     LaunchedEffect(Unit) {
@@ -72,10 +77,12 @@ fun AppRoot(container: AppContainer) {
     }
 
     // 成就解锁弹窗队列（同时解锁多个时逐个展示）
-    var pendingAchievements by remember { mutableStateOf<List<AchievementDef>>(emptyList()) }
+    var pendingAchievements by remember { mutableStateOf<List<String>>(emptyList()) }
     LaunchedEffect(Unit) {
         container.achievementManager.unlockedEvents.collect { defs ->
-            if (defs.isNotEmpty()) pendingAchievements = pendingAchievements + defs
+            if (defs.isNotEmpty()) {
+                pendingAchievements = pendingAchievements + defs.map { it.id }
+            }
         }
     }
     val showingAchievement = pendingAchievements.firstOrNull()
@@ -84,7 +91,7 @@ fun AppRoot(container: AppContainer) {
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar {
-                    TABS.forEach { tab ->
+                    tabList.forEach { tab ->
                         NavigationBarItem(
                             selected = currentRoute == tab.route,
                             onClick = {
@@ -166,9 +173,9 @@ fun AppRoot(container: AppContainer) {
         }
     }
 
-    showingAchievement?.let { def ->
+    showingAchievement?.let { achievementId ->
         AchievementPopup(
-            def = def,
+            achievementId = achievementId,
             onDismiss = { pendingAchievements = pendingAchievements.drop(1) },
         )
     }

@@ -1,18 +1,25 @@
 package com.savings.buddy.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -24,12 +31,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.savings.buddy.business.Money
 import com.savings.buddy.data.Goal
+import com.savings.buddy.data.SavingRecord
+import com.savings.buddy.ui.common.shortDate
+import com.savings.buddy.ui.i18n.LocalStrings
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -42,12 +51,13 @@ import java.time.ZoneOffset
 @Composable
 fun RecordDialog(
     goals: List<Goal>,
-    editing: com.savings.buddy.data.SavingRecord?,
+    editing: SavingRecord?,
     todayEpochDay: Long,
     onDismiss: () -> Unit,
     onSave: (goalId: Long, amountCents: Long, note: String, saveEpochDay: Long) -> Unit,
     onDelete: (() -> Unit)? = null,
 ) {
+    val t = LocalStrings.current
     var amountText by remember {
         mutableStateOf(editing?.let { Money.toYuanInput(it.amountCents) } ?: "")
     }
@@ -58,13 +68,14 @@ fun RecordDialog(
     var saveDay by remember { mutableStateOf(editing?.saveEpochDay ?: todayEpochDay) }
     var error by remember { mutableStateOf<String?>(null) }
     var submitted by remember { mutableStateOf(false) }
+    var showGoalMenu by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
 
     val quickAmounts = listOf(1_000L, 2_000L, 5_000L, 10_000L) // 10 / 20 / 50 / 100 元
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (editing == null) "记一笔" else "修改记录") },
+        title = { Text(if (editing == null) t.rdAddTitle else t.rdEditTitle) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -73,7 +84,7 @@ fun RecordDialog(
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it; error = null },
-                    label = { Text("金额（元）") },
+                    label = { Text(t.allocAmountLabel) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
@@ -90,20 +101,17 @@ fun RecordDialog(
                 }
 
                 if (goals.size > 1) {
-                    var showGoalMenu by remember { mutableStateOf(false) }
-                    androidx.compose.foundation.layout.Box {
+                    Box {
                         OutlinedButton(
                             onClick = { showGoalMenu = true },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text("目标：${goals.find { it.id == goalId }?.name ?: "请选择"}")
+                            Text(t.allocGoalPrefix.format(goals.find { it.id == goalId }?.name ?: t.allocSelectGoal))
+                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
                         }
-                        androidx.compose.material3.DropdownMenu(
-                            expanded = showGoalMenu,
-                            onDismissRequest = { showGoalMenu = false },
-                        ) {
+                        DropdownMenu(expanded = showGoalMenu, onDismissRequest = { showGoalMenu = false }) {
                             goals.forEach { g ->
-                                androidx.compose.material3.DropdownMenuItem(
+                                DropdownMenuItem(
                                     text = { Text(g.name) },
                                     onClick = { goalId = g.id; showGoalMenu = false },
                                 )
@@ -113,13 +121,16 @@ fun RecordDialog(
                 }
 
                 OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text("日期：${LocalDate.ofEpochDay(saveDay)}" + if (saveDay == todayEpochDay) "（今天）" else "")
+                    Text(
+                        t.allocDatePrefix.format(shortDate(saveDay)) +
+                            if (saveDay == todayEpochDay) t.allocTodaySuffix else ""
+                    )
                 }
 
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("备注（可选）") },
+                    label = { Text(t.allocNoteLabel) },
                     modifier = Modifier.fillMaxWidth(),
                 )
 
@@ -134,17 +145,17 @@ fun RecordDialog(
                 onClick = {
                     val cents = Money.parseToCents(amountText)
                     when {
-                        cents == null -> error = "金额格式不正确，最多两位小数"
-                        cents <= 0 -> error = "金额必须大于零"
-                        saveDay > todayEpochDay -> error = "不能选择未来日期"
-                        goalId <= 0 -> error = "请选择目标"
+                        cents == null -> error = t.errAmountFormat
+                        cents <= 0 -> error = t.errAmountPositive
+                        saveDay > todayEpochDay -> error = t.errFutureDate
+                        goalId <= 0 -> error = t.errGoalRequired
                         else -> {
                             submitted = true
                             onSave(goalId, cents, note.trim(), saveDay)
                         }
                     }
                 },
-            ) { Text("保存") }
+            ) { Text(t.allocSave) }
         },
         dismissButton = {
             Row {
@@ -152,9 +163,9 @@ fun RecordDialog(
                     TextButton(
                         enabled = !submitted,
                         onClick = { submitted = true; onDelete() },
-                    ) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                    ) { Text(t.rdDelete, color = MaterialTheme.colorScheme.error) }
                 }
-                TextButton(onClick = onDismiss) { Text("取消") }
+                TextButton(onClick = onDismiss) { Text(t.allocCancel) }
             }
         },
     )
@@ -171,9 +182,9 @@ fun RecordDialog(
                         saveDay = Instant.ofEpochMilli(ms).atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
                     }
                     showDatePicker = false
-                }) { Text("确定") }
+                }) { Text(t.commonConfirm) }
             },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text(t.allocCancel) } },
         ) {
             DatePicker(state = pickerState)
         }

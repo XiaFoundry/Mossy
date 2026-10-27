@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import com.savings.buddy.business.Allocation
 import com.savings.buddy.business.Money
 import com.savings.buddy.data.Goal
+import com.savings.buddy.ui.common.shortDate
+import com.savings.buddy.ui.i18n.LocalStrings
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -56,14 +58,15 @@ fun AllocationDialog(
     onDismiss: () -> Unit,
     onSave: (allocations: List<Pair<Long, Long>>, note: String, saveEpochDay: Long) -> Unit,
 ) {
+    val t = LocalStrings.current
     var totalText by remember { mutableStateOf("") }
     var multiSelect by remember { mutableStateOf(false) }
     var singleGoalId by remember {
-        mutableStateOf(defaultGoalId?.takeIf { goals.any { g -> g.id == it } } ?: goals.firstOrNull()?.id ?: 0L)
+        mutableStateOf(defaultGoalId?.takeIf { id -> goals.any { g -> g.id == id } } ?: goals.firstOrNull()?.id ?: 0L)
     }
     var selectedIds by remember {
         mutableStateOf(
-            setOfNotNull(defaultGoalId?.takeIf { goals.any { g -> g.id == it } } ?: goals.firstOrNull()?.id)
+            setOfNotNull(defaultGoalId?.takeIf { id -> goals.any { g -> g.id == id } } ?: goals.firstOrNull()?.id)
         )
     }
     var singleAmountText by remember { mutableStateOf("") }
@@ -97,24 +100,24 @@ fun AllocationDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("记录攒钱") },
+        title = { Text(t.allocTitle) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                // 总额 + 快捷候选
                 OutlinedTextField(
                     value = totalText,
                     onValueChange = {
                         totalText = it; error = null
                         Money.parseToCents(it)?.let { cents -> applyTotal(cents) }
                     },
-                    label = { Text("本次攒钱总额（元）") },
+                    label = { Text(t.allocTotalLabel) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                 )
+
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     quickCents.forEach { cents ->
                         FilterChip(
@@ -131,12 +134,11 @@ fun AllocationDialog(
 
                 if (goals.isEmpty()) {
                     Text(
-                        "还没有进行中的目标，请先到「目标」页创建",
+                        t.allocNoGoals,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 } else {
-                    // 模式切换
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             selected = !multiSelect,
@@ -149,7 +151,7 @@ fun AllocationDialog(
                                     error = null
                                 }
                             },
-                            label = { Text("单目标") },
+                            label = { Text(t.allocModeSingle) },
                         )
                         FilterChip(
                             selected = multiSelect,
@@ -163,19 +165,18 @@ fun AllocationDialog(
                                     error = null
                                 }
                             },
-                            label = { Text("分配到多个目标") },
+                            label = { Text(t.allocModeMulti) },
                         )
                     }
 
                     if (!multiSelect) {
-                        // 单目标：选择目标 + 一个金额输入
                         Box {
                             var showGoalMenu by remember { mutableStateOf(false) }
                             OutlinedButton(
                                 onClick = { showGoalMenu = true },
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
-                                Text("目标：${goals.find { it.id == singleGoalId }?.name ?: "请选择"}")
+                                Text(t.allocGoalPrefix.format(goals.find { it.id == singleGoalId }?.name ?: t.allocSelectGoal))
                                 Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
                             }
                             androidx.compose.material3.DropdownMenu(
@@ -193,19 +194,19 @@ fun AllocationDialog(
                         OutlinedTextField(
                             value = singleAmountText,
                             onValueChange = { singleAmountText = it; error = null },
-                            label = { Text("金额（元）") },
+                            label = { Text(t.allocAmountLabel) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     } else {
-                        // 多目标：可展开的勾选列表
                         OutlinedButton(
                             onClick = { listExpanded = !listExpanded },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
-                                if (listExpanded) "收起目标列表" else "展开目标列表（已选 ${selectedIds.size} 个）"
+                                if (listExpanded) t.allocCollapseList
+                                else t.allocExpandList.format(selectedIds.size)
                             )
                             Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
                         }
@@ -232,7 +233,7 @@ fun AllocationDialog(
                                             onValueChange = { v ->
                                                 multiAmounts = multiAmounts + (g.id to v); error = null
                                             },
-                                            label = { Text("元") },
+                                            label = { Text(t.allocYuan) },
                                             singleLine = true,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                             modifier = Modifier.weight(1f),
@@ -244,7 +245,7 @@ fun AllocationDialog(
                         if (!listExpanded && selectedIds.isNotEmpty()) {
                             val sum = multiAmounts.values.sumOf { Money.parseToCents(it) ?: 0L }
                             Text(
-                                "已选 ${selectedIds.size} 个目标，共 ${Money.format(sum)}",
+                                t.allocSelectedSummary.format(selectedIds.size, Money.format(sum)),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -253,13 +254,16 @@ fun AllocationDialog(
                 }
 
                 OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
-                    Text("日期：${LocalDate.ofEpochDay(saveDay)}" + if (saveDay == todayEpochDay) "（今天）" else "")
+                    Text(
+                        t.allocDatePrefix.format(shortDate(saveDay)) +
+                            if (saveDay == todayEpochDay) t.allocTodaySuffix else ""
+                    )
                 }
 
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("备注（可选）") },
+                    label = { Text(t.allocNoteLabel) },
                     modifier = Modifier.fillMaxWidth(),
                 )
 
@@ -272,21 +276,21 @@ fun AllocationDialog(
             Button(
                 enabled = !submitted,
                 onClick = {
-                    val t = Money.parseToCents(totalText)
+                    val total = Money.parseToCents(totalText)
                     when {
-                        goals.isEmpty() -> error = "还没有进行中的目标"
-                        t == null -> error = "总额格式不正确，最多两位小数"
-                        t <= 0 -> error = "总额必须大于零"
-                        saveDay > todayEpochDay -> error = "不能选择未来日期"
+                        goals.isEmpty() -> error = t.errNoGoals
+                        total == null -> error = t.errTotalFormat
+                        total <= 0 -> error = t.errTotalPositive
+                        saveDay > todayEpochDay -> error = t.errFutureDate
                     }
                     if (error != null) return@Button
 
                     if (!multiSelect) {
                         val cents = Money.parseToCents(singleAmountText)
                         when {
-                            singleGoalId <= 0 -> error = "请选择目标"
-                            cents == null || cents <= 0 -> error = "金额必须大于零"
-                            cents > t!! -> error = "金额不能超过本次总额"
+                            singleGoalId <= 0 -> error = t.errGoalRequired
+                            cents == null || cents <= 0 -> error = t.errAmountPositive
+                            cents > total!! -> error = t.errAmountOverTotal
                             else -> {
                                 submitted = true
                                 onSave(listOf(singleGoalId to cents), note.trim(), saveDay)
@@ -300,10 +304,10 @@ fun AllocationDialog(
                         val allValid = multiAmounts.values.all { Money.parseToCents(it) != null }
                         val positive = items.filter { it.second > 0 }
                         when {
-                            selectedIds.isEmpty() -> error = "请至少勾选一个目标"
-                            !allValid -> error = "分配金额格式不正确"
-                            sum > t!! -> error = "分配之和不能超过本次总额"
-                            positive.isEmpty() -> error = "至少分配一个大于零的金额"
+                            selectedIds.isEmpty() -> error = t.errGoalRequired
+                            !allValid -> error = t.errAmountFormat
+                            sum > total!! -> error = t.errAllocOverTotal
+                            positive.isEmpty() -> error = t.errAllocAtLeast
                             else -> {
                                 submitted = true
                                 onSave(positive, note.trim(), saveDay)
@@ -311,10 +315,10 @@ fun AllocationDialog(
                         }
                     }
                 },
-            ) { Text("保存") }
+            ) { Text(t.allocSave) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(t.allocCancel) }
         },
     )
 
@@ -330,9 +334,9 @@ fun AllocationDialog(
                         saveDay = Instant.ofEpochMilli(ms).atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
                     }
                     showDatePicker = false
-                }) { Text("确定") }
+                }) { Text(t.commonConfirm) }
             },
-            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text(t.allocCancel) } },
         ) {
             DatePicker(state = pickerState)
         }

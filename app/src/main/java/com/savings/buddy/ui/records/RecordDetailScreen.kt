@@ -43,6 +43,7 @@ import com.savings.buddy.ui.common.fullDateLabel
 import com.savings.buddy.ui.common.simpleViewModelFactory
 import com.savings.buddy.ui.common.timeLabel
 import com.savings.buddy.ui.components.RecordDialog
+import com.savings.buddy.ui.i18n.LocalStrings
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -85,6 +86,7 @@ fun RecordDetailScreen(
     recordId: Long,
     onBack: () -> Unit,
 ) {
+    val t = LocalStrings.current
     val vm: RecordDetailViewModel = viewModel(
         key = "record_$recordId",
         factory = simpleViewModelFactory { RecordDetailViewModel(container, recordId) },
@@ -97,16 +99,16 @@ fun RecordDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("记录详情") },
+                title = { Text(t.detailTitle) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = t.detailBack)
                     }
                 },
                 actions = {
                     // 编辑入口（矢量图标），等效「修改记录」
                     IconButton(onClick = { if (item != null) showEdit = true }) {
-                        Icon(Icons.Filled.Edit, contentDescription = "修改记录")
+                        Icon(Icons.Filled.Edit, contentDescription = t.detailEdit)
                     }
                 },
             )
@@ -119,7 +121,7 @@ fun RecordDetailScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Text("记录不存在或已被删除", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(t.detailMissing, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             Column(
@@ -142,24 +144,21 @@ fun RecordDetailScreen(
                             color = MaterialTheme.colorScheme.primary,
                         )
                         Spacer(Modifier.height(4.dp))
-                        Text(
-                            record.goalName,
-                            style = MaterialTheme.typography.titleMedium,
-                        )
+                        Text(record.goalName, style = MaterialTheme.typography.titleMedium)
                     }
                 }
 
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        DetailRow("日期", fullDateLabel(record.record.saveEpochDay))
+                        DetailRow(t.detailDate, fullDateLabel(record.record.saveEpochDay))
                         HorizontalDivider()
-                        DetailRow("时间", timeLabel(record.record.createdAtMillis))
+                        DetailRow(t.detailTime, timeLabel(record.record.createdAtMillis))
                         HorizontalDivider()
-                        DetailRow("目标", record.goalName)
+                        DetailRow(t.detailGoal, record.goalName)
                         HorizontalDivider()
-                        DetailRow("增加数额", Money.format(record.record.amountCents))
+                        DetailRow(t.detailAmount, Money.format(record.record.amountCents))
                         HorizontalDivider()
-                        DetailRow("备注", record.record.note.ifBlank { "无" })
+                        DetailRow(t.detailNote, record.record.note.ifBlank { t.detailNoNote })
                     }
                 }
 

@@ -36,9 +36,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.savings.buddy.data.AppContainer
 import com.savings.buddy.ui.common.simpleViewModelFactory
 import com.savings.buddy.ui.components.achievementIcon
+import com.savings.buddy.ui.i18n.LocalStrings
+import com.savings.buddy.ui.i18n.achievementDesc
+import com.savings.buddy.ui.i18n.achievementTitle
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 /** 成就查看页：展示全部成就与解锁状态 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,20 +51,24 @@ fun AchievementsScreen(
     container: AppContainer,
     onBack: () -> Unit,
 ) {
+    val t = LocalStrings.current
+    val locale = com.savings.buddy.ui.i18n.LocalAppLocale.current
     val vm: AchievementsViewModel =
         viewModel(factory = simpleViewModelFactory { AchievementsViewModel(container) })
     val states by vm.states.collectAsState()
     val unlockedCount = states.count { it.unlocked }
 
-    val dateFormatter = rememberDateFormatter()
+    val dateFormatter = androidx.compose.runtime.remember {
+        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("成就") },
+                title = { Text(t.achTitle) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = t.geBack)
                     }
                 },
             )
@@ -73,7 +81,7 @@ fun AchievementsScreen(
         ) {
             item {
                 Text(
-                    "已解锁 $unlockedCount / ${states.size}",
+                    t.achUnlockedProgress.format(unlockedCount, states.size),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -103,12 +111,12 @@ fun AchievementsScreen(
                         Spacer(Modifier.size(12.dp))
                         Column(Modifier.weight(1f)) {
                             Text(
-                                state.def.title,
+                                t.achievementTitle(state.def.id),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                state.def.description,
+                                t.achievementDesc(state.def.id),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -118,7 +126,7 @@ fun AchievementsScreen(
                                 dateFormatter.format(
                                     Instant.ofEpochMilli(state.unlockedAtMillis!!).atZone(ZoneId.systemDefault())
                                 )
-                            } else "未解锁",
+                            } else t.achLocked,
                             style = MaterialTheme.typography.labelSmall,
                             color = if (state.unlocked) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
@@ -128,12 +136,5 @@ fun AchievementsScreen(
             }
             item { Spacer(Modifier.height(24.dp)) }
         }
-    }
-}
-
-@Composable
-private fun rememberDateFormatter(): DateTimeFormatter {
-    return androidx.compose.runtime.remember {
-        DateTimeFormatter.ofPattern("yyyy年M月d日")
     }
 }

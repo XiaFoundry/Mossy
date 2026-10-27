@@ -14,6 +14,8 @@ class BackupManager(
     private val settingsStore: SettingsStore,
 ) {
 
+    private val t get() = com.savings.buddy.ui.i18n.I18nStatic.systemStrings()
+
     companion object {
         const val FORMAT_VERSION = 2
     }
@@ -64,19 +66,19 @@ class BackupManager(
         return root.toString(2)
     }
 
-    /** 校验并整体覆盖导入。校验失败抛 [IllegalArgumentException]，消息为中文原因。 */
+    /** 校验并整体覆盖导入。校验失败抛 [IllegalArgumentException]，消息已按系统语言本地化。 */
     suspend fun importJson(json: String) {
         val root = try {
             JSONObject(json)
         } catch (e: Exception) {
-            throw IllegalArgumentException("文件不是合法的 JSON 备份")
+            throw IllegalArgumentException(t.backupInvalidJson)
         }
         if (!root.has("version") || !root.has("goals") || !root.has("records")) {
-            throw IllegalArgumentException("备份缺少必要字段，不是本应用的备份文件")
+            throw IllegalArgumentException(t.backupMissingFields)
         }
         val version = root.optInt("version", -1)
         if (version < 1 || version > FORMAT_VERSION) {
-            throw IllegalArgumentException("不支持的备份版本：$version")
+            throw IllegalArgumentException(t.backupUnsupportedVersion.format(version))
         }
 
         val goalsJson = root.getJSONArray("goals")
@@ -88,13 +90,13 @@ class BackupManager(
         for (i in 0 until goalsJson.length()) {
             val o = goalsJson.getJSONObject(i)
             val id = o.getLong("id")
-            if (!goalIds.add(id)) throw IllegalArgumentException("存在重复的目标 ID：$id")
+            if (!goalIds.add(id)) throw IllegalArgumentException(t.backupDuplicateGoal.format(id))
             val name = o.optString("name", "")
-            if (name.isBlank()) throw IllegalArgumentException("存在目标名称为空的记录")
+            if (name.isBlank()) throw IllegalArgumentException(t.backupGoalNameEmpty)
             val target = o.optLong("targetCents", -1)
-            if (target <= 0) throw IllegalArgumentException("存在目标金额非法的记录（名称：$name）")
+            if (target <= 0) throw IllegalArgumentException(t.backupInvalidTarget.format(name))
             val status = o.optString("status", "")
-            if (status !in validStatus) throw IllegalArgumentException("存在目标状态非法的记录（名称：$name）")
+            if (status !in validStatus) throw IllegalArgumentException(t.backupInvalidStatus.format(name))
             goals.add(
                 Goal(
                     id = id,
@@ -114,11 +116,11 @@ class BackupManager(
         for (i in 0 until recordsJson.length()) {
             val o = recordsJson.getJSONObject(i)
             val id = o.getLong("id")
-            if (!recordIds.add(id)) throw IllegalArgumentException("存在重复的流水 ID：$id")
+            if (!recordIds.add(id)) throw IllegalArgumentException(t.backupDuplicateRecord.format(id))
             val goalId = o.getLong("goalId")
-            if (goalId !in goalIds) throw IllegalArgumentException("存在无法关联到目标的流水（流水 ID：$id）")
+            if (goalId !in goalIds) throw IllegalArgumentException(t.backupOrphanRecord.format(id))
             val amount = o.optLong("amountCents", -1)
-            if (amount <= 0) throw IllegalArgumentException("存在金额非法的流水（流水 ID：$id）")
+            if (amount <= 0) throw IllegalArgumentException(t.backupInvalidAmount.format(id))
             records.add(
                 SavingRecord(
                     id = id,

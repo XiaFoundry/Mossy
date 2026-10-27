@@ -40,7 +40,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.savings.buddy.business.AchievementDef
+import com.savings.buddy.ui.i18n.LocalStrings
+import com.savings.buddy.ui.i18n.achievementDesc
+import com.savings.buddy.ui.i18n.achievementTitle
 import kotlinx.coroutines.delay
 import kotlin.math.sin
 import kotlin.random.Random
@@ -74,28 +76,29 @@ private data class Particle(
  */
 @Composable
 fun AchievementPopup(
-    def: AchievementDef,
+    achievementId: String,
     onDismiss: () -> Unit,
 ) {
-    LaunchedEffect(def.id) {
+    val t = LocalStrings.current
+    LaunchedEffect(achievementId) {
         delay(3_500)
         onDismiss()
     }
 
     val confetti = remember { Animatable(0f) }
-    LaunchedEffect(def.id) {
+    LaunchedEffect(achievementId) {
         confetti.animateTo(1f, animationSpec = tween(2_200, easing = LinearEasing))
     }
     val iconScale = remember { Animatable(0f) }
-    LaunchedEffect(def.id) {
+    LaunchedEffect(achievementId) {
         iconScale.animateTo(
             1f,
             animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         )
     }
 
-    val particles = remember(def.id) {
-        val random = Random(def.id.hashCode())
+    val particles = remember(achievementId) {
+        val random = Random(achievementId.hashCode())
         List(64) {
             Particle(
                 xRatio = random.nextFloat(),
@@ -169,7 +172,7 @@ fun AchievementPopup(
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Icon(
-                                achievementIcon(def.id),
+                                achievementIcon(achievementId),
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier
@@ -182,26 +185,26 @@ fun AchievementPopup(
                             )
                             Spacer(Modifier.height(12.dp))
                             Text(
-                                "成就解锁！",
+                                t.popupTitle,
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                def.title,
+                                t.achievementTitle(achievementId),
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center,
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                def.description,
+                                t.achievementDesc(achievementId),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
                             )
                             Spacer(Modifier.height(20.dp))
-                            Button(onClick = onDismiss) { Text("太好了") }
+                            Button(onClick = onDismiss) { Text(t.popupOk) }
                         }
                     }
                 }

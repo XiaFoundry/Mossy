@@ -26,10 +26,19 @@ const val PALETTE_WATER = 4
 const val PALETTE_LAVENDER = 5
 const val PALETTE_MONO = 6
 
+/** 应用语言：默认跟随系统 UI 语言 */
+const val LANG_SYSTEM = 0
+const val LANG_EN = 1
+const val LANG_ZH_CN = 2
+const val LANG_ZH_TW = 3
+const val LANG_JA = 4
+const val LANG_KO = 5
+
 class SettingsStore(private val context: Context) {
 
     private val KEY_THEME = intPreferencesKey("theme")
     private val KEY_PALETTE = intPreferencesKey("palette")
+    private val KEY_LANGUAGE = intPreferencesKey("language")
     private val KEY_REMINDER_ENABLED = intPreferencesKey("reminder_enabled")
     private val KEY_REMINDER_HOUR = intPreferencesKey("reminder_hour")
     private val KEY_REMINDER_MINUTE = intPreferencesKey("reminder_minute")
@@ -44,6 +53,8 @@ class SettingsStore(private val context: Context) {
     val theme: Flow<Int> = context.dataStore.data.map { it[KEY_THEME] ?: THEME_SYSTEM }
 
     val palette: Flow<Int> = context.dataStore.data.map { it[KEY_PALETTE] ?: PALETTE_SYSTEM }
+
+    val language: Flow<Int> = context.dataStore.data.map { it[KEY_LANGUAGE] ?: LANG_SYSTEM }
 
     val reminderEnabled: Flow<Boolean> = context.dataStore.data.map { (it[KEY_REMINDER_ENABLED] ?: 0) == 1 }
 
@@ -71,6 +82,10 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setPalette(palette: Int) {
         context.dataStore.edit { it[KEY_PALETTE] = palette }
+    }
+
+    suspend fun setLanguage(language: Int) {
+        context.dataStore.edit { it[KEY_LANGUAGE] = language }
     }
 
     suspend fun setReminder(enabled: Boolean, hour: Int, minute: Int) {
