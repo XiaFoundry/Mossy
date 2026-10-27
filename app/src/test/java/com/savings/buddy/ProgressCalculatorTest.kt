@@ -3,6 +3,7 @@ package com.savings.buddy
 import com.savings.buddy.business.ProgressCalculator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -67,10 +68,10 @@ class ProgressCalculatorTest {
 
     @Test
     fun `剩余天数计算`() {
-        assertEquals(5, ProgressCalculator.remainingDays(105, 100))
-        assertEquals(0, ProgressCalculator.remainingDays(100, 100))
-        assertEquals(-3, ProgressCalculator.remainingDays(97, 100))
-        assertEquals(null, ProgressCalculator.remainingDays(null, 100))
+        assertEquals(5L, ProgressCalculator.remainingDays(105, 100))
+        assertEquals(0L, ProgressCalculator.remainingDays(100, 100))
+        assertEquals(-3L, ProgressCalculator.remainingDays(97, 100))
+        assertNull(ProgressCalculator.remainingDays(null, 100))
     }
 
     @Test

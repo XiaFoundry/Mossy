@@ -32,7 +32,9 @@ object ProgressCalculator {
         val raw = savedCents.toDouble() / targetCents.toDouble()
         val clamped = raw.coerceIn(0.0, 1.0)
         val percent = (raw * 100.0).roundToLong().toInt().coerceIn(0, 100)
-        val remaining = max(0L, targetCents - savedCents)
+        // 剩余金额：先把累计金额收敛到 [0, target]，确保进度与剩余均不为负
+        val effectiveSaved = min(max(savedCents, 0), targetCents)
+        val remaining = targetCents - effectiveSaved
         val exceeded = max(0L, savedCents - targetCents)
         return ProgressResult(
             savedCents = savedCents,
