@@ -49,7 +49,10 @@ import com.savings.buddy.ui.common.simpleViewModelFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(container: com.savings.buddy.data.AppContainer) {
+fun SettingsScreen(
+    container: com.savings.buddy.data.AppContainer,
+    onGoAchievements: () -> Unit = {},
+) {
     val context = LocalContext.current
     val vm: SettingsViewModel = viewModel(factory = simpleViewModelFactory { SettingsViewModel(container) })
     val state by vm.state.collectAsState()
@@ -142,6 +145,16 @@ fun SettingsScreen(container: com.savings.buddy.data.AppContainer) {
                 }
             }
 
+            // 成就
+            SectionCard("成就") {
+                Text(
+                    "已解锁的攒钱里程碑",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(onClick = onGoAchievements) { Text("查看成就") }
+            }
+
             // 数据
             SectionCard("数据") {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -159,7 +172,7 @@ fun SettingsScreen(container: com.savings.buddy.data.AppContainer) {
 
             // 关于
             SectionCard("关于") {
-                Text("攒钱小助手 v1.0.0", style = MaterialTheme.typography.bodyLarge)
+                Text("Mossy v1.1.0", style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "隐私说明：所有数据仅保存在本机，不上传服务器，不要求账号。" +

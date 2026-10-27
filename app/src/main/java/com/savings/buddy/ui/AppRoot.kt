@@ -12,7 +12,11 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -23,7 +27,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.savings.buddy.business.AchievementDef
 import com.savings.buddy.data.AppContainer
+import com.savings.buddy.ui.achievements.AchievementsScreen
+import com.savings.buddy.ui.components.AchievementPopup
 import com.savings.buddy.ui.goals.GoalEditScreen
 import com.savings.buddy.ui.goals.GoalsScreen
 import com.savings.buddy.ui.home.HomeScreen
@@ -35,6 +42,7 @@ object Routes {
     const val RECORDS = "records"
     const val GOALS = "goals"
     const val SETTINGS = "settings"
+    const val ACHIEVEMENTS = "achievements"
     const val GOAL_EDIT = "goalEdit?goalId={goalId}"
     fun goalEdit(goalId: Long? = null) = "goalEdit?goalId=${goalId ?: -1L}"
 }
@@ -54,6 +62,20 @@ fun AppRoot(container: AppContainer) {
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
     val showBottomBar = currentRoute in TABS.map { it.route }
+
+    // 应用启动：更新登录连击/首次启动并评估成就
+    LaunchedEffect(Unit) {
+        container.achievementManager.onAppOpen()
+    }
+
+    // 成就解锁弹窗队列（同时解锁多个时逐个展示）
+    var pendingAchievements by remember { mutableStateOf<List<AchievementDef>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        container.achievementManager.unlockedEvents.collect { defs ->
+            if (defs.isNotEmpty()) pendingAchievements = pendingAchievements + defs
+        }
+    }
+    val showingAchievement = pendingAchievements.firstOrNull()
 
     Scaffold(
         bottomBar = {
@@ -86,7 +108,6 @@ fun AppRoot(container: AppContainer) {
                 HomeScreen(
                     container = container,
                     onCreateGoal = { navController.navigate(Routes.goalEdit()) },
-                    onGoRecords = { navController.navigate(Routes.RECORDS) { launchSingleTop = true } },
                 )
             }
             composable(Routes.RECORDS) {
@@ -100,7 +121,16 @@ fun AppRoot(container: AppContainer) {
                 )
             }
             composable(Routes.SETTINGS) {
-                SettingsScreen(container = container)
+                SettingsScreen(
+                    container = container,
+                    onGoAchievements = { navController.navigate(Routes.ACHIEVEMENTS) },
+                )
+            }
+            composable(Routes.ACHIEVEMENTS) {
+                AchievementsScreen(
+                    container = container,
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(
                 route = Routes.GOAL_EDIT,
@@ -117,5 +147,12 @@ fun AppRoot(container: AppContainer) {
                 )
             }
         }
+    }
+
+    showingAchievement?.let { def ->
+        AchievementPopup(
+            def = def,
+            onDismiss = { pendingAchievements = pendingAchievements.drop(1) },
+        )
     }
 }
