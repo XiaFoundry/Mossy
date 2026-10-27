@@ -12,14 +12,24 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
-/** 主题模式 */
+/** 主题模式（亮暗） */
 const val THEME_SYSTEM = 0
 const val THEME_LIGHT = 1
 const val THEME_DARK = 2
 
+/** 主题色板：默认跟随系统（Android 12+ 动态取色），其余为固定预设 */
+const val PALETTE_SYSTEM = 0
+const val PALETTE_TEAL = 1
+const val PALETTE_PINK = 2
+const val PALETTE_MINT = 3
+const val PALETTE_WATER = 4
+const val PALETTE_LAVENDER = 5
+const val PALETTE_MONO = 6
+
 class SettingsStore(private val context: Context) {
 
     private val KEY_THEME = intPreferencesKey("theme")
+    private val KEY_PALETTE = intPreferencesKey("palette")
     private val KEY_REMINDER_ENABLED = intPreferencesKey("reminder_enabled")
     private val KEY_REMINDER_HOUR = intPreferencesKey("reminder_hour")
     private val KEY_REMINDER_MINUTE = intPreferencesKey("reminder_minute")
@@ -32,6 +42,8 @@ class SettingsStore(private val context: Context) {
     private val KEY_COMPLETED_IDS = stringPreferencesKey("completed_goal_ids")
 
     val theme: Flow<Int> = context.dataStore.data.map { it[KEY_THEME] ?: THEME_SYSTEM }
+
+    val palette: Flow<Int> = context.dataStore.data.map { it[KEY_PALETTE] ?: PALETTE_SYSTEM }
 
     val reminderEnabled: Flow<Boolean> = context.dataStore.data.map { (it[KEY_REMINDER_ENABLED] ?: 0) == 1 }
 
@@ -55,6 +67,10 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setTheme(mode: Int) {
         context.dataStore.edit { it[KEY_THEME] = mode }
+    }
+
+    suspend fun setPalette(palette: Int) {
+        context.dataStore.edit { it[KEY_PALETTE] = palette }
     }
 
     suspend fun setReminder(enabled: Boolean, hour: Int, minute: Int) {
