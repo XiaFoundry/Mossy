@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -35,6 +36,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,7 +68,6 @@ data class GoalRow(
     val progress: Float,
     val percent: Int,
     val display: GoalDisplay,
-    val isCurrent: Boolean,
 )
 
 data class GoalsUiState(val rows: List<GoalRow> = emptyList())
@@ -74,7 +75,7 @@ data class GoalsUiState(val rows: List<GoalRow> = emptyList())
 class GoalsViewModel(private val container: AppContainer) : ViewModel() {
     private val repo = container.repository
 
-    val state = combine(repo.observeGoals(), repo.observeRecords(), repo.currentGoalId) { goals, records, currentId ->
+    val state = combine(repo.observeGoals(), repo.observeRecords()) { goals, records ->
         val today = LocalDate.now().toEpochDay()
         GoalsUiState(
             rows = goals.map { g ->
@@ -86,18 +87,21 @@ class GoalsViewModel(private val container: AppContainer) : ViewModel() {
                     progress = p.progress,
                     percent = p.percent,
                     display = GoalDisplayCalc.of(g, saved, today),
-                    isCurrent = g.id == currentId,
                 )
             },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GoalsUiState())
 
-    fun setCurrent(id: Long) = viewModelScope.launch { repo.setCurrentGoal(id) }
     fun togglePause(row: GoalRow) = viewModelScope.launch {
         val newStatus = if (row.goal.status == GoalStatus.PAUSED) GoalStatus.IN_PROGRESS else GoalStatus.PAUSED
         repo.setGoalStatus(row.goal, newStatus)
     }
+
     fun archive(row: GoalRow) = viewModelScope.launch { repo.setGoalStatus(row.goal, GoalStatus.ARCHIVED) }
+
+    /** 取消归档：恢复为进行中 */
+    fun unarchive(row: GoalRow) = viewModelScope.launch { repo.setGoalStatus(row.goal, GoalStatus.IN_PROGRESS) }
+
     fun delete(goal: Goal) = viewModelScope.launch { repo.deleteGoal(goal.id) }
 }
 
@@ -111,6 +115,10 @@ fun GoalsScreen(
     val state by vm.state.collectAsState()
     var menuFor by remember { mutableStateOf<GoalRow?>(null) }
     var confirmDelete by remember { mutableStateOf<Goal?>(null) }
+    var archivedExpanded by rememberSaveable { mutableStateOf(false) }
+
+    val activeRows = state.rows.filter { it.goal.status != GoalStatus.ARCHIVED }
+    val archivedRows = state.rows.filter { it.goal.status == GoalStatus.ARCHIVED }
 
     Scaffold(
         floatingActionButton = {
@@ -139,82 +147,67 @@ fun GoalsScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                item {
-                    Text("点击卡片切换为当前目标", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                items(activeRows.size, key = { activeRows[it].goal.id }) { i ->
+                    GoalCard(
+                        row = activeRows[i],
+                        menuExpanded = menuFor?.goal?.id == activeRows[i].goal.id,
+                        onMenuExpandedChange = { if (!it) menuFor = null },
+                        onCardClick = { onEditGoal(activeRows[i].goal.id) },
+                        onMenu = { menuFor = activeRows[i] },
+                        onPauseResume = { vm.togglePause(activeRows[i]) },
+                        onArchive = { vm.archive(activeRows[i]) },
+                        onUnarchive = { vm.unarchive(activeRows[i]) },
+                        onEdit = { onEditGoal(activeRows[i].goal.id) },
+                        onDelete = { confirmDelete = activeRows[i].goal },
+                    )
                 }
-                items(state.rows.size, key = { state.rows[it].goal.id }) { i ->
-                    val row = state.rows[i]
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { vm.setCurrent(row.goal.id) },
-                    ) {
-                        Column(Modifier.padding(16.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .clip(CircleShape)
-                                        .background(goalColor(row.goal.colorIndex)),
+
+                // 归档折叠区
+                if (archivedRows.isNotEmpty()) {
+                    item(key = "archived_header") {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { archivedExpanded = !archivedExpanded },
+                        ) {
+                            Row(
+                                Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    "归档",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
                                 )
                                 Spacer(Modifier.size(8.dp))
                                 Text(
-                                    row.goal.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                if (row.isCurrent) {
-                                    Spacer(Modifier.size(8.dp))
-                                    Text(
-                                        "当前",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                                Spacer(Modifier.weight(1f))
-                                Text(
-                                    GoalDisplayCalc.label(row.display),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = if (row.display == GoalDisplay.OVERDUE) MaterialTheme.colorScheme.error
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                IconButton(onClick = { menuFor = row }) {
-                                    Icon(Icons.Filled.MoreVert, contentDescription = "更多操作")
-                                }
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            LinearProgressIndicator(
-                                progress = { row.progress },
-                                modifier = Modifier.fillMaxWidth().height(8.dp),
-                                color = ringColorFor(row.progress),
-                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Row {
-                                Text(
-                                    "${Money.format(row.savedCents)} / ${Money.format(row.goal.targetCents)}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                                Spacer(Modifier.weight(1f))
-                                Text(
-                                    "${row.percent}%",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                            }
-                            row.goal.deadlineEpochDay?.let {
-                                Text(
-                                    "截止 ${LocalDate.ofEpochDay(it)} · " +
-                                        when (row.goal.planType) {
-                                            com.savings.buddy.data.PlanType.FIXED ->
-                                                "固定 ${Money.format(row.goal.dailyFixedCents)}/天"
-                                            com.savings.buddy.data.PlanType.REVERSE -> "目标倒推"
-                                        },
+                                    "${archivedRows.size} 个目标",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+                                Spacer(Modifier.weight(1f))
+                                Icon(
+                                    Icons.Filled.ArrowDropDown,
+                                    contentDescription = if (archivedExpanded) "收起" else "展开",
+                                    modifier = Modifier.size(24.dp),
+                                )
                             }
+                        }
+                    }
+                    if (archivedExpanded) {
+                        items(archivedRows.size, key = { archivedRows[it].goal.id }) { i ->
+                            GoalCard(
+                                row = archivedRows[i],
+                                menuExpanded = menuFor?.goal?.id == archivedRows[i].goal.id,
+                                onMenuExpandedChange = { if (!it) menuFor = null },
+                                onCardClick = { onEditGoal(archivedRows[i].goal.id) },
+                                onMenu = { menuFor = archivedRows[i] },
+                                onPauseResume = { vm.togglePause(archivedRows[i]) },
+                                onArchive = { vm.archive(archivedRows[i]) },
+                                onUnarchive = { vm.unarchive(archivedRows[i]) },
+                                onEdit = { onEditGoal(archivedRows[i].goal.id) },
+                                onDelete = { confirmDelete = archivedRows[i].goal },
+                            )
                         }
                     }
                 }
@@ -222,25 +215,7 @@ fun GoalsScreen(
         }
     }
 
-    // 每张卡片的操作菜单
-    menuFor?.let { row ->
-        DropdownMenu(expanded = true, onDismissRequest = { menuFor = null }) {
-            if (!row.isCurrent) {
-                DropdownMenuItem(text = { Text("设为当前目标") }, onClick = { vm.setCurrent(row.goal.id); menuFor = null })
-            }
-            DropdownMenuItem(
-                text = { Text(if (row.goal.status == GoalStatus.PAUSED) "恢复进行" else "暂停") },
-                onClick = { vm.togglePause(row); menuFor = null },
-            )
-            DropdownMenuItem(text = { Text("归档") }, onClick = { vm.archive(row); menuFor = null })
-            DropdownMenuItem(text = { Text("编辑") }, onClick = { onEditGoal(row.goal.id); menuFor = null })
-            DropdownMenuItem(
-                text = { Text("删除", color = MaterialTheme.colorScheme.error) },
-                onClick = { confirmDelete = row.goal; menuFor = null },
-            )
-        }
-    }
-
+    // 删除确认
     confirmDelete?.let { goal ->
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
@@ -253,6 +228,112 @@ fun GoalsScreen(
             },
             dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("取消") } },
         )
+    }
+}
+
+@Composable
+private fun GoalCard(
+    row: GoalRow,
+    menuExpanded: Boolean,
+    onMenuExpandedChange: (Boolean) -> Unit,
+    onCardClick: () -> Unit,
+    onMenu: () -> Unit,
+    onPauseResume: () -> Unit,
+    onArchive: () -> Unit,
+    onUnarchive: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onCardClick),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // 状态色点：随进度从红色逐渐过渡到绿色
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(ringColorFor(row.progress)),
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    row.goal.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    GoalDisplayCalc.label(row.display),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (row.display == GoalDisplay.OVERDUE) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                // 菜单锚点：DropdownMenu 放在按钮所在的 Box 内，展开位置紧贴按钮
+                Box {
+                    IconButton(onClick = onMenu) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "更多操作")
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { onMenuExpandedChange(false) },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(if (row.goal.status == GoalStatus.PAUSED) "恢复进行" else "暂停") },
+                            onClick = { onPauseResume(); onMenuExpandedChange(false) },
+                        )
+                        if (row.goal.status == GoalStatus.ARCHIVED) {
+                            DropdownMenuItem(
+                                text = { Text("取消归档") },
+                                onClick = { onUnarchive(); onMenuExpandedChange(false) },
+                            )
+                        } else {
+                            DropdownMenuItem(
+                                text = { Text("归档") },
+                                onClick = { onArchive(); onMenuExpandedChange(false) },
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("编辑") },
+                            onClick = { onEdit(); onMenuExpandedChange(false) },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+                            onClick = { onDelete(); onMenuExpandedChange(false) },
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { row.progress },
+                modifier = Modifier.fillMaxWidth().height(8.dp),
+                color = ringColorFor(row.progress),
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row {
+                Text(
+                    "${Money.format(row.savedCents)} / ${Money.format(row.goal.targetCents)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "${row.percent}%",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            row.goal.deadlineEpochDay?.let {
+                Text(
+                    "截止 ${LocalDate.ofEpochDay(it)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 

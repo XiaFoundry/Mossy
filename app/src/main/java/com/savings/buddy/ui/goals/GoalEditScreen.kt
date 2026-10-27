@@ -16,13 +16,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,13 +32,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,7 +50,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.savings.buddy.business.Money
 import com.savings.buddy.data.AppContainer
 import com.savings.buddy.data.Goal
-import com.savings.buddy.data.PlanType
 import com.savings.buddy.ui.common.simpleViewModelFactory
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -59,7 +58,6 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 
 class GoalEditViewModel(private val container: AppContainer) : ViewModel() {
-    private val repo = container.repository
 
     val loaded = MutableStateFlow<Goal?>(null)
 
@@ -72,8 +70,6 @@ class GoalEditViewModel(private val container: AppContainer) : ViewModel() {
         goalId: Long?,
         name: String,
         targetText: String,
-        planType: PlanType,
-        dailyText: String,
         deadlineEpochDay: Long?,
         note: String,
         colorIndex: Int,
@@ -86,17 +82,6 @@ class GoalEditViewModel(private val container: AppContainer) : ViewModel() {
             val target = Money.parseToCents(targetText)
             if (target == null) { onError("目标金额格式不正确，最多两位小数"); return@launch }
             if (target <= 0) { onError("目标金额必须大于零"); return@launch }
-
-            var daily = 0L
-            if (planType == PlanType.FIXED) {
-                val d = Money.parseToCents(dailyText)
-                if (d == null) { onError("每日金额格式不正确"); return@launch }
-                if (d <= 0) { onError("每日金额必须大于零"); return@launch }
-                daily = d
-            }
-            if (planType == PlanType.REVERSE && deadlineEpochDay == null) {
-                onError("目标倒推模式需要设置截止日期"); return@launch
-            }
             // 新建时不允许已经过期的截止日期；编辑旧目标不强制
             if (goalId == null && deadlineEpochDay != null && deadlineEpochDay < LocalDate.now().toEpochDay()) {
                 onError("截止日期不能早于今天"); return@launch
@@ -111,13 +96,11 @@ class GoalEditViewModel(private val container: AppContainer) : ViewModel() {
             val updated = existing.copy(
                 name = trimmedName,
                 targetCents = target,
-                planType = planType,
-                dailyFixedCents = daily,
                 deadlineEpochDay = deadlineEpochDay,
                 note = note.trim(),
                 colorIndex = colorIndex,
             )
-            repo.saveGoal(updated)
+            container.repository.saveGoal(updated)
             onSuccess()
         }
     }
@@ -135,8 +118,6 @@ fun GoalEditScreen(
 
     var name by remember { mutableStateOf("") }
     var targetText by remember { mutableStateOf("") }
-    var planType by remember { mutableStateOf(PlanType.FIXED) }
-    var dailyText by remember { mutableStateOf("") }
     var deadline by remember { mutableStateOf<Long?>(null) }
     var note by remember { mutableStateOf("") }
     var colorIndex by remember { mutableStateOf(0) }
@@ -149,8 +130,6 @@ fun GoalEditScreen(
         if (!initialized) {
             name = g.name
             targetText = Money.toYuanInput(g.targetCents)
-            planType = g.planType
-            dailyText = Money.toYuanInput(g.dailyFixedCents)
             deadline = g.deadlineEpochDay
             note = g.note
             colorIndex = g.colorIndex
@@ -196,42 +175,15 @@ fun GoalEditScreen(
             )
 
             Column {
-                Text("攒钱方式", style = MaterialTheme.typography.labelLarge)
+                Text("截止日期（可选）", style = MaterialTheme.typography.labelLarge)
                 Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = planType == PlanType.FIXED,
-                        onClick = { planType = PlanType.FIXED; error = null },
-                        label = { Text("固定金额") },
-                    )
-                    FilterChip(
-                        selected = planType == PlanType.REVERSE,
-                        onClick = { planType = PlanType.REVERSE; error = null },
-                        label = { Text("目标倒推") },
-                    )
-                }
-                Text(
-                    if (planType == PlanType.FIXED) "每天建议攒固定金额，例如每天 ¥20"
-                    else "根据剩余金额和剩余天数，自动倒推每日建议",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            if (planType == PlanType.FIXED) {
-                OutlinedTextField(
-                    value = dailyText,
-                    onValueChange = { dailyText = it; error = null },
-                    label = { Text("每日建议金额（元）") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else {
                 OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        deadline?.let { "截止日期：${LocalDate.ofEpochDay(it)}" } ?: "选择截止日期（必填）"
+                        deadline?.let { LocalDate.ofEpochDay(it).toString() } ?: "不设置"
                     )
+                }
+                if (deadline != null) {
+                    TextButton(onClick = { deadline = null }) { Text("清除截止日期") }
                 }
             }
 
@@ -270,7 +222,7 @@ fun GoalEditScreen(
 
             Button(
                 onClick = {
-                    vm.save(goalId, name, targetText, planType, dailyText, deadline, note, colorIndex,
+                    vm.save(goalId, name, targetText, deadline, note, colorIndex,
                         onError = { error = it }, onSuccess = onBack)
                 },
                 modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -281,7 +233,7 @@ fun GoalEditScreen(
     }
 
     if (showDatePicker) {
-        val pickerState = androidx.compose.material3.rememberDatePickerState(
+        val pickerState = rememberDatePickerState(
             initialSelectedDateMillis = (deadline ?: LocalDate.now().toEpochDay()) * 86_400_000L,
         )
         DatePickerDialog(
