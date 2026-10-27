@@ -2,6 +2,7 @@ package com.savings.buddy.data
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
@@ -64,4 +65,17 @@ interface RecordDao {
 
     @Query("DELETE FROM records")
     suspend fun deleteAll()
+}
+
+@Dao
+interface AchievementDao {
+
+    @Query("SELECT * FROM achievements ORDER BY unlockedAtMillis ASC")
+    fun observeAll(): Flow<List<AchievementEntity>>
+
+    @Query("SELECT * FROM achievements")
+    suspend fun getAllOnce(): List<AchievementEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAll(items: List<AchievementEntity>)
 }
