@@ -16,13 +16,15 @@ object ReminderScheduler {
     private const val REQUEST_CODE = 1001
     const val CHANNEL_ID = "saving_reminder"
 
+    private val t get() = com.savings.buddy.ui.i18n.I18nStatic.systemStrings()
+
     fun ensureChannel(context: Context) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Mossy 攒钱提醒",
+            t.msgChannelName,
             NotificationManager.IMPORTANCE_DEFAULT,
-        ).apply { description = "每天提醒你记录攒钱进度" }
+        ).apply { description = t.msgChannelDesc }
         manager.createNotificationChannel(channel)
     }
 
@@ -60,10 +62,11 @@ object ReminderScheduler {
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         ReminderScheduler.ensureChannel(context)
+        val t = com.savings.buddy.ui.i18n.I18nStatic.systemStrings()
         val notification = NotificationCompat.Builder(context, ReminderScheduler.CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Mossy")
-            .setContentText("今天的攒钱记录了吗？离目标又近一步～")
+            .setContentTitle(t.msgNotifTitle)
+            .setContentText(t.msgNotifText)
             .setAutoCancel(true)
             .build()
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
