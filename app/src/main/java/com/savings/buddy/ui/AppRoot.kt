@@ -34,6 +34,7 @@ import com.savings.buddy.ui.components.AchievementPopup
 import com.savings.buddy.ui.goals.GoalEditScreen
 import com.savings.buddy.ui.goals.GoalsScreen
 import com.savings.buddy.ui.home.HomeScreen
+import com.savings.buddy.ui.records.RecordDetailScreen
 import com.savings.buddy.ui.records.RecordsScreen
 import com.savings.buddy.ui.settings.SettingsScreen
 
@@ -43,6 +44,8 @@ object Routes {
     const val GOALS = "goals"
     const val SETTINGS = "settings"
     const val ACHIEVEMENTS = "achievements"
+    const val RECORD_DETAIL = "recordDetail/{recordId}"
+    fun recordDetail(recordId: Long) = "recordDetail/$recordId"
     const val GOAL_EDIT = "goalEdit?goalId={goalId}"
     fun goalEdit(goalId: Long? = null) = "goalEdit?goalId=${goalId ?: -1L}"
 }
@@ -111,7 +114,21 @@ fun AppRoot(container: AppContainer) {
                 )
             }
             composable(Routes.RECORDS) {
-                RecordsScreen(container = container)
+                RecordsScreen(
+                    container = container,
+                    onOpenDetail = { recordId -> navController.navigate(Routes.recordDetail(recordId)) },
+                )
+            }
+            composable(
+                route = Routes.RECORD_DETAIL,
+                arguments = listOf(navArgument("recordId") { type = NavType.LongType }),
+            ) { entry ->
+                val recordId = entry.arguments?.getLong("recordId") ?: -1L
+                RecordDetailScreen(
+                    container = container,
+                    recordId = recordId,
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(Routes.GOALS) {
                 GoalsScreen(
