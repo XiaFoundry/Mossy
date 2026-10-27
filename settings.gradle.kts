@@ -18,5 +18,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "SavingAssistant"
+rootProject.name = "Mossy"
 include(":app")

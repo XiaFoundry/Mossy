@@ -20,7 +20,7 @@ object ReminderScheduler {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "攒钱提醒",
+            "Mossy 攒钱提醒",
             NotificationManager.IMPORTANCE_DEFAULT,
         ).apply { description = "每天提醒你记录攒钱进度" }
         manager.createNotificationChannel(channel)
@@ -62,7 +62,7 @@ class ReminderReceiver : BroadcastReceiver() {
         ReminderScheduler.ensureChannel(context)
         val notification = NotificationCompat.Builder(context, ReminderScheduler.CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("攒钱小助手")
+            .setContentTitle("Mossy")
             .setContentText("今天的攒钱记录了吗？离目标又近一步～")
             .setAutoCancel(true)
             .build()
