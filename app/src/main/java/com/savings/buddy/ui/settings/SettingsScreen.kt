@@ -5,7 +5,10 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,13 +16,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
@@ -38,14 +46,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.savings.buddy.data.PALETTE_SYSTEM
 import com.savings.buddy.data.THEME_DARK
 import com.savings.buddy.data.THEME_LIGHT
 import com.savings.buddy.data.THEME_SYSTEM
 import com.savings.buddy.ui.common.simpleViewModelFactory
+import com.savings.buddy.ui.theme.ThemePalettes
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,6 +75,7 @@ fun SettingsScreen(
     var showImportConfirm by remember { mutableStateOf<android.net.Uri?>(null) }
     var showClearConfirm by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var paletteExpanded by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -113,6 +127,66 @@ fun SettingsScreen(
                         onClick = { vm.setTheme(THEME_DARK) },
                         label = { Text("深色") },
                     )
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                // 主题色详细设置：点击展开/收起
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { paletteExpanded = !paletteExpanded },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("主题色", style = MaterialTheme.typography.bodyLarge)
+                    Spacer(Modifier.weight(1f))
+                    // 当前选择预览
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        currentPalettePreview(state.palette).forEach { color ->
+                            Box(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.size(6.dp))
+                    Text(
+                        paletteLabel(state.palette),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Icon(
+                        Icons.Filled.ArrowDropDown,
+                        contentDescription = if (paletteExpanded) "收起" else "展开",
+                    )
+                }
+
+                if (paletteExpanded) {
+                    Spacer(Modifier.height(4.dp))
+                    // 跟随系统（默认，动态取色）
+                    PaletteOptionRow(
+                        label = "跟随系统（默认）",
+                        sub = if (Build.VERSION.SDK_INT >= 31) "使用壁纸动态取色" else "经典青绿（需 Android 12+ 动态取色）",
+                        selected = state.palette == PALETTE_SYSTEM,
+                        preview = listOf(
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.primaryContainer,
+                            MaterialTheme.colorScheme.secondaryContainer,
+                        ),
+                        onClick = { vm.setPalette(PALETTE_SYSTEM) },
+                    )
+                    // 固定色板
+                    ThemePalettes.ALL.forEach { spec ->
+                        PaletteOptionRow(
+                            label = spec.label,
+                            sub = null,
+                            selected = state.palette == spec.key,
+                            preview = spec.preview,
+                            onClick = { vm.setPalette(spec.key) },
+                        )
+                    }
                 }
             }
 
@@ -172,7 +246,7 @@ fun SettingsScreen(
 
             // 关于
             SectionCard("关于") {
-                Text("Mossy v1.1.2", style = MaterialTheme.typography.bodyLarge)
+                Text("Mossy v1.1.3", style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "隐私说明：所有数据仅保存在本机，不上传服务器，不要求账号。" +
@@ -243,6 +317,71 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
             content()
+        }
+    }
+}
+
+/** 当前主题色的预览色（跟随系统时取当前生效色） */
+@Composable
+private fun currentPalettePreview(palette: Int): List<Color> {
+    return if (palette == PALETTE_SYSTEM) {
+        listOf(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.secondaryContainer,
+        )
+    } else {
+        ThemePalettes.byKey(palette).preview
+    }
+}
+
+private fun paletteLabel(palette: Int): String =
+    if (palette == PALETTE_SYSTEM) "跟随系统" else ThemePalettes.byKey(palette).label
+
+/** 主题色选项行：色块预览 + 名称 + 选中态 */
+@Composable
+private fun PaletteOptionRow(
+    label: String,
+    sub: String?,
+    selected: Boolean,
+    preview: List<Color>,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            preview.forEach { color ->
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(color)
+                )
+            }
+        }
+        Spacer(Modifier.size(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            )
+            sub?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        if (selected) {
+            Text("✓", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
         }
     }
 }

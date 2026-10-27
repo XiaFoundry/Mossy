@@ -21,7 +21,10 @@ class MainActivity : ComponentActivity() {
             val themeMode by container.settingsStore.theme
                 .flowOn(Dispatchers.IO)
                 .collectAsState(initial = 0)
-            SavingTheme(themeMode = themeMode) {
+            val palette by container.settingsStore.palette
+                .flowOn(Dispatchers.IO)
+                .collectAsState(initial = 0)
+            SavingTheme(themeMode = themeMode, palette = palette) {
                 AppRoot(container = container)
             }
         }

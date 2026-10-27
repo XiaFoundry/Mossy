@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.savings.buddy.data.AppContainer
+import com.savings.buddy.data.PALETTE_SYSTEM
 import com.savings.buddy.data.THEME_DARK
 import com.savings.buddy.data.THEME_LIGHT
 import com.savings.buddy.data.THEME_SYSTEM
@@ -20,6 +21,7 @@ import kotlinx.coroutines.withContext
 
 data class SettingsUiState(
     val theme: Int = THEME_SYSTEM,
+    val palette: Int = PALETTE_SYSTEM,
     val reminderEnabled: Boolean = false,
     val reminderHour: Int = 20,
     val reminderMinute: Int = 0,
@@ -34,15 +36,18 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
 
     val state: StateFlow<SettingsUiState> = combine(
         container.settingsStore.theme,
+        container.settingsStore.palette,
         container.settingsStore.reminderEnabled,
         container.settingsStore.reminderTime,
-    ) { theme, enabled, time ->
-        SettingsUiState(theme, enabled, time.first, time.second)
+    ) { theme, palette, enabled, time ->
+        SettingsUiState(theme, palette, enabled, time.first, time.second)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     fun consumeMessage() { _message.value = null }
 
     fun setTheme(mode: Int) = viewModelScope.launch { container.settingsStore.setTheme(mode) }
+
+    fun setPalette(palette: Int) = viewModelScope.launch { container.settingsStore.setPalette(palette) }
 
     fun setReminder(context: Context, enabled: Boolean, hour: Int, minute: Int) {
         viewModelScope.launch {
