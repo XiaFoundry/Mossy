@@ -51,6 +51,12 @@ interface RecordDao {
     )
     fun observeAllWithGoal(): Flow<List<RecordWithGoal>>
 
+    @Query(
+        "SELECT r.*, g.name AS goalName FROM records r " +
+            "INNER JOIN goals g ON r.goalId = g.id WHERE r.id = :id"
+    )
+    fun observeByIdWithGoal(id: Long): Flow<RecordWithGoal?>
+
     @Query("SELECT * FROM records")
     suspend fun getAllOnce(): List<SavingRecord>
 

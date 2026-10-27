@@ -13,6 +13,8 @@ class SavingRepository(
     fun observeRecords(): Flow<List<SavingRecord>> = db.recordDao().observeAll()
     fun observeRecordsWithGoal(): Flow<List<RecordWithGoal>> = db.recordDao().observeAllWithGoal()
 
+    fun observeRecordById(id: Long): Flow<RecordWithGoal?> = db.recordDao().observeByIdWithGoal(id)
+
     suspend fun addRecord(goalId: Long, amountCents: Long, note: String, saveEpochDay: Long): Long {
         val now = System.currentTimeMillis()
         return db.recordDao().insert(
@@ -23,17 +25,19 @@ class SavingRepository(
                 note = note.trim(),
                 createdAtMillis = now,
                 updatedAtMillis = now,
+                batchId = newBatchId(),
             )
         )
     }
 
-    /** 一笔攒钱分配到多个目标：单事务写入多条流水（仅写入金额大于 0 的分配） */
+    /** 一笔攒钱分配到多个目标：同一批次（单事务写入多条流水，仅写入金额大于 0 的分配） */
     suspend fun addAllocatedRecords(
         allocations: List<Pair<Long, Long>>,
         note: String,
         saveEpochDay: Long,
     ) {
         val now = System.currentTimeMillis()
+        val batchId = newBatchId()
         db.withTransaction {
             allocations.forEach { (goalId, cents) ->
                 if (cents > 0) {
@@ -45,12 +49,16 @@ class SavingRepository(
                             note = note.trim(),
                             createdAtMillis = now,
                             updatedAtMillis = now,
+                            batchId = batchId,
                         )
                     )
                 }
             }
         }
     }
+
+    private fun newBatchId(): String = "batch-" + System.currentTimeMillis() + "-" +
+        (1000..9999).random()
 
     suspend fun updateRecord(record: SavingRecord) {
         db.recordDao().update(record.copy(updatedAtMillis = System.currentTimeMillis()))

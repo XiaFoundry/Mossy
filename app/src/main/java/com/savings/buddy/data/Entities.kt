@@ -46,6 +46,8 @@ data class SavingRecord(
     val note: String = "",
     val createdAtMillis: Long,
     val updatedAtMillis: Long,
+    /** 批次 ID：一次分配保存产生的多条流水共享同一批次；单条记录也拥有独立批次 */
+    val batchId: String = "",
 )
 
 /** 流水 + 所属目标名（联表查询结果） */
