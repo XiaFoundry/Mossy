@@ -147,6 +147,7 @@ fun HomeScreen(
         }
         AllocationDialog(
             goals = activeGoals,
+            defaultGoalId = state.mostSavedGoalId,
             todayEpochDay = today,
             onDismiss = { showAllocationDialog = false },
             onSave = { allocations, note, day ->

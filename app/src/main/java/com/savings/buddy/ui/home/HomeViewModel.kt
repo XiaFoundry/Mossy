@@ -27,6 +27,8 @@ data class HomeUiState(
     val monthTotalCents: Long = 0,
     val allTotalCents: Long = 0,
     val goals: List<Goal> = emptyList(),
+    /** 已攒金额最多的进行中目标（分配对话框的默认选择） */
+    val mostSavedGoalId: Long? = null,
 )
 
 class HomeViewModel(private val container: AppContainer) : ViewModel() {
@@ -44,12 +46,16 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         val progress = if (targetTotal > 0) {
             ProgressCalculator.calculate(savedTotal, targetTotal)
         } else null
+        val activeGoals = goals.filter { it.status == com.savings.buddy.data.GoalStatus.IN_PROGRESS }
+        val savedByGoal = records.groupBy { it.goalId }.mapValues { entry -> entry.value.sumOf { it.amountCents } }
+        val mostSavedGoalId = activeGoals.maxByOrNull { savedByGoal[it.id] ?: 0L }?.id
+            ?: activeGoals.firstOrNull()?.id
         HomeUiState(
             hasGoals = goals.isNotEmpty(),
             savedTotalCents = savedTotal,
             targetTotalCents = targetTotal,
             progress = progress,
-            activeGoalCount = goals.count { it.status == com.savings.buddy.data.GoalStatus.IN_PROGRESS },
+            activeGoalCount = activeGoals.size,
             goalCount = goals.size,
             monthTotalCents = records.filter {
                 val d = LocalDate.ofEpochDay(it.saveEpochDay)
@@ -57,6 +63,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
             }.sumOf { it.amountCents },
             allTotalCents = savedTotal,
             goals = goals,
+            mostSavedGoalId = mostSavedGoalId,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
