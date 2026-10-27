@@ -1,7 +1,7 @@
 package com.savings.buddy.data
 
+import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 
 /** 统一数据入口：集中维护时间戳与联动逻辑 */
 class SavingRepository(
@@ -12,9 +12,6 @@ class SavingRepository(
     fun observeGoals(): Flow<List<Goal>> = db.goalDao().observeAll()
     fun observeRecords(): Flow<List<SavingRecord>> = db.recordDao().observeAll()
     fun observeRecordsWithGoal(): Flow<List<RecordWithGoal>> = db.recordDao().observeAllWithGoal()
-    val currentGoalId: Flow<Long?> = settings.currentGoalId
-
-    suspend fun setCurrentGoal(id: Long?) = settings.setCurrentGoalId(id)
 
     suspend fun addRecord(goalId: Long, amountCents: Long, note: String, saveEpochDay: Long): Long {
         val now = System.currentTimeMillis()
@@ -28,6 +25,31 @@ class SavingRepository(
                 updatedAtMillis = now,
             )
         )
+    }
+
+    /** 一笔攒钱分配到多个目标：单事务写入多条流水（仅写入金额大于 0 的分配） */
+    suspend fun addAllocatedRecords(
+        allocations: List<Pair<Long, Long>>,
+        note: String,
+        saveEpochDay: Long,
+    ) {
+        val now = System.currentTimeMillis()
+        db.withTransaction {
+            allocations.forEach { (goalId, cents) ->
+                if (cents > 0) {
+                    db.recordDao().insert(
+                        SavingRecord(
+                            goalId = goalId,
+                            amountCents = cents,
+                            saveEpochDay = saveEpochDay,
+                            note = note.trim(),
+                            createdAtMillis = now,
+                            updatedAtMillis = now,
+                        )
+                    )
+                }
+            }
+        }
     }
 
     suspend fun updateRecord(record: SavingRecord) {
@@ -48,9 +70,6 @@ class SavingRepository(
 
     suspend fun deleteGoal(id: Long) {
         db.goalDao().deleteById(id) // 流水按外键级联删除
-        if (settings.currentGoalId.first() == id) {
-            settings.setCurrentGoalId(null)
-        }
     }
 
     suspend fun setGoalStatus(goal: Goal, status: GoalStatus) {

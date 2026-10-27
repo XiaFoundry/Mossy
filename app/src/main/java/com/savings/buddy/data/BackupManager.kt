@@ -7,6 +7,7 @@ import org.json.JSONObject
 /**
  * JSON 备份导出与恢复。
  * 导入前校验：文件格式、数据版本、金额合法性、ID 唯一性、关联关系。
+ * v2：Goal 不再包含攒钱方式字段；导入兼容 v1 旧备份（忽略 planType/dailyFixedCents）。
  */
 class BackupManager(
     private val db: AppDatabase,
@@ -14,7 +15,7 @@ class BackupManager(
 ) {
 
     companion object {
-        const val FORMAT_VERSION = 1
+        const val FORMAT_VERSION = 2
     }
 
     suspend fun exportJson(): String {
@@ -32,8 +33,6 @@ class BackupManager(
                             put("id", g.id)
                             put("name", g.name)
                             put("targetCents", g.targetCents)
-                            put("planType", g.planType.name)
-                            put("dailyFixedCents", g.dailyFixedCents)
                             if (g.deadlineEpochDay != null) put("deadlineEpochDay", g.deadlineEpochDay)
                             put("note", g.note)
                             put("colorIndex", g.colorIndex)
@@ -82,7 +81,6 @@ class BackupManager(
 
         val goalsJson = root.getJSONArray("goals")
         val recordsJson = root.getJSONArray("records")
-        val validPlans = PlanType.entries.map { it.name }.toSet()
         val validStatus = GoalStatus.entries.map { it.name }.toSet()
 
         val goals = mutableListOf<Goal>()
@@ -95,8 +93,6 @@ class BackupManager(
             if (name.isBlank()) throw IllegalArgumentException("存在目标名称为空的记录")
             val target = o.optLong("targetCents", -1)
             if (target <= 0) throw IllegalArgumentException("存在目标金额非法的记录（名称：$name）")
-            val plan = o.optString("planType", "")
-            if (plan !in validPlans) throw IllegalArgumentException("存在攒钱方式非法的记录（名称：$name）")
             val status = o.optString("status", "")
             if (status !in validStatus) throw IllegalArgumentException("存在目标状态非法的记录（名称：$name）")
             goals.add(
@@ -104,8 +100,6 @@ class BackupManager(
                     id = id,
                     name = name,
                     targetCents = target,
-                    planType = PlanType.valueOf(plan),
-                    dailyFixedCents = o.optLong("dailyFixedCents", 0).coerceAtLeast(0),
                     deadlineEpochDay = if (o.has("deadlineEpochDay")) o.getLong("deadlineEpochDay") else null,
                     note = o.optString("note", ""),
                     colorIndex = o.optInt("colorIndex", 0),
@@ -147,12 +141,11 @@ class BackupManager(
         }
     }
 
-    /** 清空全部数据（设置保留） */
+    /** 清空全部数据 */
     suspend fun clearAllData() {
         db.withTransaction {
             db.recordDao().deleteAll()
             db.goalDao().deleteAll()
         }
-        settingsStore.setCurrentGoalId(null)
     }
 }
