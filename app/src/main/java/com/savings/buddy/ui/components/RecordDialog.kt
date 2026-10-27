@@ -7,50 +7,42 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.savings.buddy.business.Money
 import com.savings.buddy.data.Goal
-import com.savings.buddy.data.SavingRecord
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 
 /**
- * 记录攒钱对话框：新建与编辑共用。
- * 金额必须大于零、最多两位小数；支持快捷金额与补记（不允许未来日期）。
+ * 记录攒钱对话框（单目标版，历史页使用）。
+ * 金额必须大于零、最多两位小数；快捷候选固定为 10/20/50/100；支持补记（不允许未来日期）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordDialog(
     goals: List<Goal>,
-    activeGoal: Goal?,
-    editing: SavingRecord?,
-    defaultSuggestionCents: Long,
+    editing: com.savings.buddy.data.SavingRecord?,
     todayEpochDay: Long,
     onDismiss: () -> Unit,
     onSave: (goalId: Long, amountCents: Long, note: String, saveEpochDay: Long) -> Unit,
@@ -61,45 +53,23 @@ fun RecordDialog(
     }
     var note by remember { mutableStateOf(editing?.note ?: "") }
     var goalId by remember {
-        mutableStateOf(editing?.goalId ?: activeGoal?.id ?: goals.firstOrNull()?.id ?: 0L)
+        mutableStateOf(editing?.goalId ?: goals.firstOrNull()?.id ?: 0L)
     }
     var saveDay by remember { mutableStateOf(editing?.saveEpochDay ?: todayEpochDay) }
     var error by remember { mutableStateOf<String?>(null) }
     var submitted by remember { mutableStateOf(false) }
-    var showGoalMenu by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
 
-    val selectedGoal = goals.find { it.id == goalId }
-    val quickAmounts = buildList {
-        if (defaultSuggestionCents > 0) add("建议 " to defaultSuggestionCents)
-        addAll(listOf(1_000L, 2_000L, 5_000L, 10_000L).map { Money.format(it) to it })
-    }
+    val quickAmounts = listOf(1_000L, 2_000L, 5_000L, 10_000L) // 10 / 20 / 50 / 100 元
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (editing == null) "记录攒钱" else "修改记录") },
+        title = { Text(if (editing == null) "记一笔" else "修改记录") },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (goals.size > 1) {
-                    Column {
-                        OutlinedButton(onClick = { showGoalMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text("目标：${selectedGoal?.name ?: "请选择"}")
-                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
-                        }
-                        DropdownMenu(expanded = showGoalMenu, onDismissRequest = { showGoalMenu = false }) {
-                            goals.forEach { g ->
-                                DropdownMenuItem(
-                                    text = { Text(g.name) },
-                                    onClick = { goalId = g.id; showGoalMenu = false },
-                                )
-                            }
-                        }
-                    }
-                }
-
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it; error = null },
@@ -110,12 +80,35 @@ fun RecordDialog(
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    quickAmounts.forEach { (label, cents) ->
+                    quickAmounts.forEach { cents ->
                         FilterChip(
                             selected = Money.toYuanInput(cents) == amountText.trim(),
                             onClick = { amountText = Money.toYuanInput(cents); error = null },
-                            label = { Text(label) },
+                            label = { Text(Money.format(cents)) },
                         )
+                    }
+                }
+
+                if (goals.size > 1) {
+                    var showGoalMenu by remember { mutableStateOf(false) }
+                    androidx.compose.foundation.layout.Box {
+                        OutlinedButton(
+                            onClick = { showGoalMenu = true },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("目标：${goals.find { it.id == goalId }?.name ?: "请选择"}")
+                        }
+                        androidx.compose.material3.DropdownMenu(
+                            expanded = showGoalMenu,
+                            onDismissRequest = { showGoalMenu = false },
+                        ) {
+                            goals.forEach { g ->
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = { Text(g.name) },
+                                    onClick = { goalId = g.id; showGoalMenu = false },
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -167,7 +160,7 @@ fun RecordDialog(
     )
 
     if (showDatePicker) {
-        val pickerState = androidx.compose.material3.rememberDatePickerState(
+        val pickerState = rememberDatePickerState(
             initialSelectedDateMillis = saveDay * 86_400_000L,
         )
         DatePickerDialog(

@@ -16,7 +16,7 @@ object GoalDisplayCalc {
             GoalStatus.COMPLETED -> GoalDisplay.COMPLETED
             GoalStatus.IN_PROGRESS -> when {
                 savedCents >= goal.targetCents -> GoalDisplay.COMPLETED
-                DailySuggestion.isOverdue(goal, savedCents, todayEpochDay) -> GoalDisplay.OVERDUE
+                isOverdue(goal, savedCents, todayEpochDay) -> GoalDisplay.OVERDUE
                 else -> GoalDisplay.RUNNING
             }
         }
@@ -30,4 +30,18 @@ object GoalDisplayCalc {
         GoalDisplay.PAUSED -> "已暂停"
         GoalDisplay.ARCHIVED -> "已归档"
     }
+
+    /** 已逾期：进行中、未完成、截止日期已过 */
+    fun isOverdue(goal: Goal, savedCents: Long, todayEpochDay: Long): Boolean {
+        if (goal.status != GoalStatus.IN_PROGRESS) return false
+        if (savedCents >= goal.targetCents) return false
+        val deadline = goal.deadlineEpochDay ?: return false
+        return deadline < todayEpochDay
+    }
+
+    /** 逾期天数，未逾期返回 0 */
+    fun overdueDays(goal: Goal, savedCents: Long, todayEpochDay: Long): Long =
+        if (isOverdue(goal, savedCents, todayEpochDay)) {
+            todayEpochDay - (goal.deadlineEpochDay ?: todayEpochDay)
+        } else 0L
 }
