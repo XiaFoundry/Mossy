@@ -172,7 +172,7 @@ fun SettingsScreen(
 
             // 关于
             SectionCard("关于") {
-                Text("Mossy v1.1.1", style = MaterialTheme.typography.bodyLarge)
+                Text("Mossy v1.1.2", style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "隐私说明：所有数据仅保存在本机，不上传服务器，不要求账号。" +
